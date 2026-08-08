@@ -481,9 +481,9 @@ Developed as part of **Smart India Hackathon 2025** to build a resilient, access
 ## Team Name
 Recursive:- 
 
-Dhruvi Srivastava \n
-Akshara Kamboj\n
-Saanvvii Jhhaa\n
-Anjali Mishra\n
-Aruni Mishra\n
-Bhavya Aggarwa\nl 
+* Dhruvi Srivastava 
+* Akshara Kamboj
+* Saanvvii Jhhaa
+* Anjali Mishra
+* Aruni Mishra
+* Bhavya Aggarwal 
