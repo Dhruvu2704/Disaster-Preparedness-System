@@ -2813,16 +2813,25 @@ function sos() {
 }
 
 
-function sendSOS() {
+async function sendSOS() {
 
-  showToast(
-    state.online
-      ? "SOS sent — authorities notified"
-      : "SOS saved offline — will sync when connected"
-  );
+  const sosData = {
+    type: "SOS",
+    message: "Emergency SOS",
+    timestamp: new Date().toISOString()
+  };
 
+  if (state.online) {
+
+    showToast("SOS sent — authorities notified");
+
+  } else {
+
+    await indexedDBService.queueSOS(sosData);
+
+    showToast("SOS saved offline — will sync when connected");
+  }
 }
-
 
 /* =========================================================
    AI ASSISTANT
