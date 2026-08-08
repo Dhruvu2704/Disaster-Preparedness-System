@@ -479,4 +479,11 @@ This project is developed for **educational and hackathon purposes** under the S
 Developed as part of **Smart India Hackathon 2025** to build a resilient, accessible, and offline-capable disaster preparedness and response platform for citizens and emergency management authorities.
 
 ## Team Name
-Recursive
+Recursive:- 
+
+Dhruvi Srivastava \n
+Akshara Kamboj\n
+Saanvvii Jhhaa\n
+Anjali Mishra\n
+Aruni Mishra\n
+Bhavya Aggarwa\nl 
