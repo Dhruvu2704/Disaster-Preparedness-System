@@ -1,4 +1,4 @@
-# RescueNet
+# ResQNet
 
 **Offline-First Disaster Preparedness & Response System**
 
@@ -10,7 +10,7 @@
 
 ## 📌 Project Overview
 
-RescueNet is an **offline-first disaster preparedness, emergency response, and recovery platform** designed for situations where internet connectivity becomes unreliable or completely unavailable.
+ResQNet is an **offline-first disaster preparedness, emergency response, and recovery platform** designed for situations where internet connectivity becomes unreliable or completely unavailable.
 
 The system ensures that users can still access:
 
@@ -41,7 +41,7 @@ Most existing emergency applications depend heavily on cloud connectivity and be
 
 ## 💡 Proposed Solution
 
-RescueNet provides a **Progressive Web Application (PWA)** that supports the complete disaster lifecycle.
+ResQNet provides a **Progressive Web Application (PWA)** that supports the complete disaster lifecycle.
 
 ### 1. Prepare
 
@@ -131,7 +131,7 @@ IndexedDB → /api/sync → FastAPI → PostgreSQL
 ## 📂 Project Structure
 
 ```text
-RescueNet/
+ResQNet/
 │
 ├── frontend/
 │   ├── index.html
@@ -162,7 +162,7 @@ RescueNet/
 │   └── requirements.txt
 │
 └── database/
-    └── rescuenet_schema.sql
+    └── ResQNet_schema.sql
 ```
 
 ---
@@ -314,13 +314,13 @@ pip install -r backend/requirements.txt
 ### 5. Create PostgreSQL Database
 
 ```sql
-CREATE DATABASE rescuenet;
+CREATE DATABASE ResQNet;
 ```
 
 ### 6. Run Schema
 
 ```bash
-psql -U postgres -d rescuenet -f database/rescuenet_schema.sql
+psql -U postgres -d ResQNet -f database/ResQNet_schema.sql
 ```
 
 ### 7. Start FastAPI Server
@@ -456,13 +456,13 @@ EMERGENCY ACTION
 RECOVERY
 ```
 
-RescueNet is designed to remain useful **before, during, and after a disaster**, making it more than just an SOS application.
+ResQNet is designed to remain useful **before, during, and after a disaster**, making it more than just an SOS application.
 
 ---
 
 ## 📌 Final Statement
 
-> **RescueNet transforms a smartphone into a disaster survival toolkit that continues functioning even when conventional digital infrastructure becomes unavailable.**
+> **ResQNet transforms a smartphone into a disaster survival toolkit that continues functioning even when conventional digital infrastructure becomes unavailable.**
 
 This project was developed for **Smart India Hackathon 2025** under **Problem Statement SIH250008** and follows an **offline-first, resilient emergency response architecture** using **HTML, CSS, JavaScript, IndexedDB, FastAPI, and PostgreSQL**.
 
