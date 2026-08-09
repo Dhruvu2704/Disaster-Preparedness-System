@@ -1,6 +1,6 @@
 # ResQNet
 
-**Offline-First Disaster Preparedness & Response System**
+**Online and Offline Disaster Preparedness & Response System**
 
 **Smart India Hackathon 2025 | Problem Statement: SIH250008**
 
@@ -10,7 +10,7 @@
 
 ## 📌 Project Overview
 
-ResQNet is an **offline-first disaster preparedness, emergency response, and recovery platform** designed for situations where internet connectivity becomes unreliable or completely unavailable.
+ResQNet is an **Online and Offline disaster preparedness, emergency response, and recovery platform** designed for situations where internet connectivity becomes unreliable or completely unavailable.
 
 The system ensures that users can still access:
 
@@ -464,7 +464,7 @@ ResQNet is designed to remain useful **before, during, and after a disaster**, m
 
 > **ResQNet transforms a smartphone into a disaster survival toolkit that continues functioning even when conventional digital infrastructure becomes unavailable.**
 
-This project was developed for **Smart India Hackathon 2025** under **Problem Statement SIH250008** and follows an **offline-first, resilient emergency response architecture** using **HTML, CSS, JavaScript, IndexedDB, FastAPI, and PostgreSQL**.
+This project was developed for **Smart India Hackathon 2025** under **Problem Statement SIH250008** and follows an **Online and Offline, resilient emergency response architecture** using **HTML, CSS, JavaScript, IndexedDB, FastAPI, and PostgreSQL**.
 
 ---
 
