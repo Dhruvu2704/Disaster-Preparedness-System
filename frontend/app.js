@@ -1,5 +1,17 @@
 const app = document.getElementById("app");
 const toast = document.getElementById("toast");
+const API_BASE = "http://127.0.0.1:8000/api";
+
+
+async function apiGet(path) {
+  const response = await fetch(`${API_BASE}${path}`);
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  return response.json();
+}
 
 const state = {
   location: "Sector 7G, New Delhi",
@@ -234,6 +246,23 @@ function status(text, type = "good") {
 
 function home() {
 
+  const currentAlert =
+  Array.isArray(state.alerts) && state.alerts.length
+    ? state.alerts[state.alerts.length - 1]
+    : {
+        title: "No active alerts",
+        description: "No emergency alerts available."
+      };
+
+  const nearestShelter =
+    Array.isArray(state.shelters) && state.shelters.length
+      ? state.shelters[0]
+      : {
+          name: "No shelter available",
+          district: "Unknown",
+          capacity: 0
+        };
+
   return shell(`
 
     ${sectionTitle(
@@ -307,14 +336,13 @@ function home() {
           </p>
 
           <h2 class="mt-1 text-xl font-extrabold">
-            Flash flood warning
+            ${currentAlert.title}
           </h2>
 
           <p
             class="mt-2 text-sm leading-5 text-white/90">
 
-            Flash flooding has been reported in your
-            area. Move to higher ground immediately.
+            ${currentAlert.description}
 
           </p>
 
@@ -393,6 +421,21 @@ function home() {
 
     </div>
 
+    <section class="mb-5">
+
+      <div class="mb-3 flex items-end justify-between">
+        <h2 class="text-lg font-extrabold">
+          Nearby shelter map
+        </h2>
+      </div>
+
+      <div
+        id="emergency-map"
+        class="h-64 w-full overflow-hidden rounded-[24px] border border-slate-200">
+      </div>
+
+    </section>
+
 
     <!-- NEAREST SHELTER -->
 
@@ -413,11 +456,11 @@ function home() {
             </p>
 
             <h2 class="mt-1 text-lg font-extrabold">
-              Relief Camp A
+              ${nearestShelter.name}
             </h2>
 
             <p class="text-xs text-slate-500">
-              1.8 km · Sector 7G
+              ${nearestShelter.district}
             </p>
 
           </div>
@@ -432,7 +475,7 @@ function home() {
           <div class="rounded-2xl bg-paper p-3">
 
             <p class="text-lg font-extrabold metric">
-              188
+              ${nearestShelter.capacity}
             </p>
 
             <p class="text-[9px] uppercase text-slate-400">
@@ -2232,18 +2275,26 @@ function initMap() {
 
 
 function mapPage() {
-
+  // Page render hone ke baad map initialize karo
   setTimeout(() => initMap(), 50);
 
+  const nearestShelter =
+    Array.isArray(state.shelters) && state.shelters.length
+      ? state.shelters[0]
+      : {
+          name: "No shelter available",
+          district: "Unknown",
+          capacity: 0,
+          latitude: 28.6139,
+          longitude: 77.2090
+        };
 
   return shell(`
-
     ${sectionTitle(
       "Emergency map",
       "FIND HELP AROUND YOU.",
       "Shelters, medical camps and essential resources."
     )}
-
 
     <div
       class="mb-3 flex items-center
@@ -2251,10 +2302,7 @@ function mapPage() {
       border-[#dce7e1] bg-white
       px-4 py-3">
 
-      ${icon(
-        "search",
-        "w-4 h-4 text-slate-400"
-      )}
+      ${icon("search", "w-4 h-4 text-slate-400")}
 
       <input
         class="w-full bg-transparent
@@ -2263,7 +2311,6 @@ function mapPage() {
       />
 
     </div>
-
 
     <div
       class="mb-3 flex gap-2
@@ -2282,27 +2329,25 @@ function mapPage() {
       ]
         .map(
           x => `
-
             <button
               class="whitespace-nowrap
               rounded-full bg-white
               px-3 py-2 text-[10px]
               font-bold border
               border-[#dce7e1]">
-
               ${x}
-
             </button>
-
           `
         )
         .join("")}
 
     </div>
 
-
-    <div id="map" class="shadow-soft"></div>
-
+    <!-- REAL INTERACTIVE MAP -->
+    <div
+      id="map"
+      class="h-72 w-full overflow-hidden rounded-[24px] border border-slate-200 shadow-soft">
+    </div>
 
     <div
       class="card -mt-8 relative z-10
@@ -2318,17 +2363,15 @@ function mapPage() {
             class="text-[10px]
             font-extrabold uppercase
             tracking-widest text-mint">
-
             Nearest safe shelter
-
           </p>
 
           <h2 class="mt-1 text-lg font-extrabold">
-            Relief Camp A
+            ${nearestShelter.name}
           </h2>
 
           <p class="text-xs text-slate-500">
-            1.8 km · 188 spaces available
+            ${nearestShelter.district} · ${nearestShelter.capacity} spaces available
           </p>
 
         </div>
@@ -2337,19 +2380,13 @@ function mapPage() {
 
       </div>
 
-
       <div class="mt-3 flex gap-2">
 
         <button
-          onclick="showToast('Navigation started')"
-          class="flex-1 rounded-full
-          bg-ink py-2.5 text-xs
-          font-bold text-white">
-
+          onclick="focusShelterOnMap()"
+          class="flex-1 rounded-full bg-ink py-2.5 text-xs font-bold text-white">
           Navigate →
-
         </button>
-
 
         <button
           onclick="go('shelter')"
@@ -2365,55 +2402,45 @@ function mapPage() {
 
     </div>
 
-
     <div class="mt-4 grid grid-cols-3 gap-2">
 
       <button
         onclick="showToast('Centered on current location')"
         class="card py-3 text-xs font-bold">
 
-        ${icon(
-          "locate-fixed",
-          "w-4 h-4 mx-auto mb-1"
-        )}
+        ${icon("locate-fixed", "w-4 h-4 mx-auto mb-1")}
 
         Locate
 
       </button>
 
-
       <button
         onclick="go('ai')"
         class="card py-3 text-xs font-bold">
 
-        ${icon(
-          "bot",
-          "w-4 h-4 mx-auto mb-1"
-        )}
+        ${icon("bot", "w-4 h-4 mx-auto mb-1")}
 
         AI
 
       </button>
-
 
       <button
         onclick="go('sos')"
         class="card py-3 text-xs
         font-bold text-coral">
 
-        ${icon(
-          "siren",
-          "w-4 h-4 mx-auto mb-1"
-        )}
+        ${icon("siren", "w-4 h-4 mx-auto mb-1")}
 
         SOS
 
       </button>
 
     </div>
-
-  `, "action");
+  `, "map");
 }
+
+let emergencyMap;
+
 
 
 /* =========================================================
@@ -5367,4 +5394,64 @@ window.addEventListener(
 );
 
 
+async function connectBackend() {
+  try {
+    // Fetch live data from FastAPI
+    state.shelters = await apiGet("/maps/shelters/");
+    state.hospitals = await apiGet("/emergency/hospitals/");
+
+    state.alerts = await apiGet("/recovery/alerts/");
+
+    // Latest alert displayed on frontend
+    if (state.alerts.length) {
+      state.activeAlert =
+        state.alerts[state.alerts.length - 1];
+    }
+
+    state.guides =
+      await apiGet("/preparedness/guides/");
+
+    console.log("Live Data Loaded");
+
+    render();
+    initMap();
+  } catch (error) {
+    console.error(
+      "Backend connection failed:",
+      error
+    );
+  }
+}
+// Run once when the page opens
+connectBackend();
+
+
 render();
+
+
+
+function initMap() {
+  const mapElement = document.getElementById("emergency-map");
+
+  if (!mapElement || typeof L === "undefined") return;
+
+  if (window.resqMap) {
+    window.resqMap.remove();
+  }
+
+  window.resqMap = L.map("emergency-map").setView([28.6139, 77.2090], 10);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(window.resqMap);
+
+  (state.shelters || []).forEach((shelter) => {
+    L.marker([shelter.latitude, shelter.longitude])
+      .addTo(window.resqMap)
+      .bindPopup(`
+        <strong>${shelter.name}</strong><br>
+        ${shelter.district}<br>
+        Capacity: ${shelter.capacity}
+      `);
+  });
+}
