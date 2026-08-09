@@ -2162,117 +2162,40 @@ function emergency() {
    MAP
 ========================================================= */
 
+let emergencyMap;
+
 function initMap() {
+  const container = document.getElementById("emergency-map");
+  if (!container) return;
 
-  const el = document.getElementById("map");
-
-  if (!el || el.dataset.ready) {
-    return;
+  if (emergencyMap) {
+    emergencyMap.remove();
   }
 
-  el.dataset.ready = "1";
+  emergencyMap = L.map(container).setView([28.6692, 77.4538], 11);
 
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(emergencyMap);
 
-  const map = L
-    .map(el, {
-      zoomControl: false
-    })
-    .setView([28.6139, 77.2090], 12);
-
-
-  L
-    .control
-    .zoom({
-      position: "bottomright"
-    })
-    .addTo(map);
-
-
-  L
-    .tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        maxZoom: 19,
-        attribution: "© OpenStreetMap"
+  // Backend shelters ko map par dikhao
+  if (Array.isArray(state.shelters)) {
+    state.shelters.forEach(shelter => {
+      if (shelter.latitude && shelter.longitude) {
+        L.marker([shelter.latitude, shelter.longitude])
+          .addTo(emergencyMap)
+          .bindPopup(`
+            <b>${shelter.name}</b><br>
+            ${shelter.district}<br>
+            Capacity: ${shelter.capacity}
+          `);
       }
-    )
-    .addTo(map);
+    });
+  }
 
-
-  const points = [
-
-    [
-      28.6139,
-      77.2090,
-      "Your location",
-      "Current position"
-    ],
-
-    [
-      28.6270,
-      77.2150,
-      "Relief Camp A",
-      "188 spaces · Food · Medical"
-    ],
-
-    [
-      28.6320,
-      77.2050,
-      "Medical Camp",
-      "Doctors: 4"
-    ],
-
-    [
-      28.6050,
-      77.2250,
-      "Food Distribution",
-      "Food available"
-    ],
-
-    [
-      28.6500,
-      77.1950,
-      "Hospital",
-      "Emergency department"
-    ]
-
-  ];
-
-
-  points.forEach((p, i) => {
-
-    const color =
-      i === 0
-        ? "#e84a5f"
-        : "#06483d";
-
-
-    const marker = L
-      .circleMarker(
-        [p[0], p[1]],
-        {
-          radius: i === 0 ? 10 : 8,
-          color: "#fff",
-          weight: 3,
-          fillColor: color,
-          fillOpacity: 1
-        }
-      )
-      .addTo(map);
-
-
-    marker.bindPopup(`
-      <b>${p[2]}</b>
-      <br>
-      <span style="font-size:12px">
-        ${p[3]}
-      </span>
-    `);
-
-  });
-
+  // Leaflet ko refresh force karo
+  setTimeout(() => emergencyMap.invalidateSize(), 100);
 }
-
 
 function mapPage() {
   // Page render hone ke baad map initialize karo
@@ -2438,8 +2361,6 @@ function mapPage() {
     </div>
   `, "map");
 }
-
-let emergencyMap;
 
 
 
@@ -5430,28 +5351,3 @@ render();
 
 
 
-function initMap() {
-  const mapElement = document.getElementById("emergency-map");
-
-  if (!mapElement || typeof L === "undefined") return;
-
-  if (window.resqMap) {
-    window.resqMap.remove();
-  }
-
-  window.resqMap = L.map("emergency-map").setView([28.6139, 77.2090], 10);
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(window.resqMap);
-
-  (state.shelters || []).forEach((shelter) => {
-    L.marker([shelter.latitude, shelter.longitude])
-      .addTo(window.resqMap)
-      .bindPopup(`
-        <strong>${shelter.name}</strong><br>
-        ${shelter.district}<br>
-        Capacity: ${shelter.capacity}
-      `);
-  });
-}
