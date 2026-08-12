@@ -26,7 +26,10 @@ RETURNING id, name, email;
 
 
 -- Get user by email (For Login)
-SELECT id, email, password
+SELECT
+    id,
+    email,
+    password
 FROM users
 WHERE email = 'aarav.sharma@gmail.com';
 
@@ -377,6 +380,22 @@ VALUES
 RETURNING id, priority, status;
 
 
+-- Get help requests with location
+SELECT
+    h.id,
+    h.user_id,
+    h.food,
+    h.medicine,
+    h.water,
+    h.shelter,
+    h.latitude,
+    h.longitude,
+    h.priority,
+    h.status
+FROM help_requests h
+ORDER BY h.id DESC;
+
+
 -- =============================================================================
 -- 7. HEATMAP DATA APIS
 -- =============================================================================
@@ -399,6 +418,17 @@ SELECT
     severity,
     status
 FROM damage_reports
+ORDER BY id DESC;
+
+
+-- Get help-request coordinates for map/heatmap
+SELECT
+    id,
+    latitude,
+    longitude,
+    priority,
+    status
+FROM help_requests
 ORDER BY id DESC;
 
 
