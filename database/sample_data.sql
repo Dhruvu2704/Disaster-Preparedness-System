@@ -8,7 +8,7 @@
 -- =============================================================================
 
 INSERT INTO users
-(name, email, password, phone, blood_group, medical_conditions, address, city, district)
+(name, email, password_hash, phone, blood_group, medical_conditions, address, city, district)
 VALUES
 (
     'Aarav Sharma',
