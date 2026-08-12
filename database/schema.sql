@@ -31,7 +31,7 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     blood_group VARCHAR(10),
     medical_conditions TEXT,
