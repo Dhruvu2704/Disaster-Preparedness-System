@@ -175,16 +175,15 @@ CREATE TABLE damage_reports (
 
 CREATE TABLE help_requests (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER
-        REFERENCES users(id)
-        ON DELETE SET NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     food BOOLEAN DEFAULT FALSE,
     medicine BOOLEAN DEFAULT FALSE,
     water BOOLEAN DEFAULT FALSE,
     shelter BOOLEAN DEFAULT FALSE,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
     priority VARCHAR(20) DEFAULT 'Medium',
-    status VARCHAR(30) DEFAULT 'Pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    status VARCHAR(30) DEFAULT 'Pending'
 );
 
 
