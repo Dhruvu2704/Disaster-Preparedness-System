@@ -1,14 +1,13 @@
 -- =============================================================================
 -- RESQNET DATABASE SCHEMA (PostgreSQL)
 -- SIH Problem Statement: SIH250008
--- Updated Database Team Guidelines
 -- =============================================================================
 
+
 -- =============================================================================
--- DROP TABLES
+-- DROP TABLES IF THEY EXIST
 -- =============================================================================
 
-DROP TABLE IF EXISTS hazard_hotspots CASCADE;
 DROP TABLE IF EXISTS alerts CASCADE;
 DROP TABLE IF EXISTS help_requests CASCADE;
 DROP TABLE IF EXISTS damage_reports CASCADE;
@@ -32,7 +31,7 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     blood_group VARCHAR(10),
     medical_conditions TEXT,
@@ -41,6 +40,7 @@ CREATE TABLE users (
     district VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 
 CREATE TABLE emergency_contacts (
     id SERIAL PRIMARY KEY,
@@ -66,6 +66,7 @@ CREATE TABLE disaster_guides (
     after_text TEXT
 );
 
+
 CREATE TABLE preparedness_checklist (
     id SERIAL PRIMARY KEY,
     item_name VARCHAR(150) NOT NULL,
@@ -83,10 +84,11 @@ CREATE TABLE shelters (
     name VARCHAR(150) NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
-    capacity INTEGER DEFAULT 0 CHECK (capacity >= 0),
+    capacity INTEGER DEFAULT 0,
     status VARCHAR(50) DEFAULT 'Active',
     district VARCHAR(100)
 );
+
 
 CREATE TABLE hospitals (
     id SERIAL PRIMARY KEY,
@@ -94,8 +96,9 @@ CREATE TABLE hospitals (
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
     phone VARCHAR(20),
-    beds_available INTEGER DEFAULT 0 CHECK (beds_available >= 0)
+    beds_available INTEGER DEFAULT 0
 );
+
 
 CREATE TABLE police_stations (
     id SERIAL PRIMARY KEY,
@@ -104,6 +107,7 @@ CREATE TABLE police_stations (
     longitude DOUBLE PRECISION NOT NULL,
     phone VARCHAR(20)
 );
+
 
 CREATE TABLE fire_stations (
     id SERIAL PRIMARY KEY,
@@ -127,12 +131,14 @@ CREATE TABLE sos_requests (
     longitude DOUBLE PRECISION NOT NULL,
     battery_level INTEGER,
     status VARCHAR(30) DEFAULT 'Pending'
-        CHECK (status IN (
-            'Pending',
-            'Received',
-            'Assigned',
-            'Resolved'
-        )),
+        CHECK (
+            status IN (
+                'Pending',
+                'Received',
+                'Assigned',
+                'Resolved'
+            )
+        ),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     received_at TIMESTAMP
 );
@@ -154,9 +160,9 @@ CREATE TABLE missing_persons (
     last_seen TEXT,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
-    status VARCHAR(30) DEFAULT 'Missing',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    status VARCHAR(30) DEFAULT 'Missing'
 );
+
 
 CREATE TABLE damage_reports (
     id SERIAL PRIMARY KEY,
@@ -169,19 +175,24 @@ CREATE TABLE damage_reports (
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
     severity VARCHAR(30),
-    status VARCHAR(30) DEFAULT 'Reported',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    status VARCHAR(30) DEFAULT 'Reported'
 );
+
 
 CREATE TABLE help_requests (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    user_id INTEGER
+        REFERENCES users(id)
+        ON DELETE SET NULL,
     food BOOLEAN DEFAULT FALSE,
     medicine BOOLEAN DEFAULT FALSE,
     water BOOLEAN DEFAULT FALSE,
     shelter BOOLEAN DEFAULT FALSE,
+
+    -- Location of the help request
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
+
     priority VARCHAR(20) DEFAULT 'Medium',
     status VARCHAR(30) DEFAULT 'Pending'
 );
@@ -198,21 +209,5 @@ CREATE TABLE alerts (
     severity VARCHAR(30),
     district VARCHAR(100),
     start_time TIMESTAMP,
-    end_time TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
--- =============================================================================
--- 6.7 HAZARD HOTSPOTS MODULE
--- =============================================================================
-
-CREATE TABLE hazard_hotspots (
-    id SERIAL PRIMARY KEY,
-    district VARCHAR(100) NOT NULL,
-    latitude DOUBLE PRECISION NOT NULL,
-    longitude DOUBLE PRECISION NOT NULL,
-    risk_score DOUBLE PRECISION NOT NULL,
-    risk_level VARCHAR(30) NOT NULL,
-    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    end_time TIMESTAMP
 );
