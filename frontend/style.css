@@ -1,45 +1,57 @@
-* {
-  box-sizing: border-box;
+/* =========================================================
+   RESQNET MEMBER 1 UI ADDITIONS
+========================================================= */
+
+
+/* Page transition */
+
+.fade-in {
+  animation: fadeIn 0.25s ease-in-out;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+@keyframes fadeIn {
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-}
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
 
-/* Scrollbar */
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f3f6f2;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #a7bbb5;
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #063f35;
 }
 
 
-/* Cards */
+/* Navigation */
 
-.resq-card {
+.nav-item {
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.nav-item:hover {
+  transform: translateY(-1px);
+}
+
+.nav-item.active {
+  background: #e6faf4;
+  color: #063f35;
+}
+
+
+/* Dashboard cards */
+
+.card {
   background: white;
   border: 1px solid #e5ebe8;
   border-radius: 18px;
-  box-shadow: 0 10px 30px rgba(6, 63, 53, 0.06);
+  box-shadow:
+    0 10px 30px
+    rgba(6, 63, 53, 0.06);
 }
 
 
@@ -58,36 +70,91 @@ body {
 }
 
 
-/* Emergency pulse */
+/* Progress bars */
 
-.sos-pulse {
-  animation: sosPulse 2s infinite;
-}
-
-@keyframes sosPulse {
-
-  0% {
-    box-shadow: 0 0 0 0 rgba(232, 74, 95, 0.35);
-  }
-
-  70% {
-    box-shadow: 0 0 0 18px rgba(232, 74, 95, 0);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(232, 74, 95, 0);
-  }
-
-}
-
-
-/* Map */
-
-#emergency-map {
-  min-height: 520px;
-  width: 100%;
-  border-radius: 18px;
+.progress-track {
+  height: 8px;
   overflow: hidden;
+  border-radius: 999px;
+  background: #e8efeb;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+
+/* Government map */
+
+.command-map {
+  width: 100%;
+  min-height: 480px;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+
+/* Shelter / resource cards */
+
+.resource-card {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.resource-card:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 12px 30px
+    rgba(6, 63, 53, 0.09);
+}
+
+
+/* SOS */
+
+.sos-button {
+  transition: transform 0.2s ease;
+}
+
+.sos-button:hover {
+  transform: scale(1.03);
+}
+
+.sos-button:active {
+  transform: scale(0.98);
+}
+
+
+/* Forms */
+
+.resq-input {
+  width: 100%;
+
+  border: 1px solid #dce7e1;
+
+  border-radius: 12px;
+
+  padding: 12px 14px;
+
+  outline: none;
+
+  background: white;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.resq-input:focus {
+
+  border-color: #00a884;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(0, 217, 165, 0.12);
+
 }
 
 
@@ -95,108 +162,8 @@ body {
 
 @media (max-width: 768px) {
 
-  #emergency-map {
-    min-height: 400px;
-  }
-
-}
-
-
-/* News image */
-
-.news-image {
-  width: 100%;
-  height: 170px;
-  object-fit: cover;
-  border-radius: 14px;
-}
-
-
-/* Status indicators */
-
-.status-online {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #00d9a5;
-  display: inline-block;
-}
-
-.status-offline {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #e84a5f;
-  display: inline-block;
-}
-
-
-/* Navigation */
-
-.bottom-nav {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-
-/* Hide scrollbar for horizontal cards */
-
-.hide-scrollbar {
-  scrollbar-width: none;
-}
-
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-
-/* Leaflet */
-
-.leaflet-container {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-}
-
-
-/* Emergency alert */
-
-.alert-danger {
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-}
-
-
-/* Gradient header */
-
-.resq-gradient {
-  background:
-    linear-gradient(
-      135deg,
-      #063f35 0%,
-      #06483d 50%,
-      #08715d 100%
-    );
-}
-
-
-/* Loading */
-
-.loading {
-  animation: loading 1.2s infinite ease-in-out;
-}
-
-@keyframes loading {
-
-  0% {
-    opacity: 0.45;
-  }
-
-  50% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0.45;
+  .command-map {
+    min-height: 380px;
   }
 
 }

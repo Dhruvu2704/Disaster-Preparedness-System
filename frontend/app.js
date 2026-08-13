@@ -1,5274 +1,674 @@
-const app = document.getElementById("app");
-const toast = document.getElementById("toast");
-const API_BASE = "http://127.0.0.1:8000/api";
+/* =========================================================
+   RESQNET - COMPLETE FRONTEND APP
+   MEMBER 1: UI / FRONTEND ONLY
+
+   Roles:
+   1. Citizen
+   2. Shelter Representative
+   3. Government / Authority
+
+   NOTE:
+   No IndexedDB
+   No backend
+   No API
+   No Service Worker
+   No sync logic
+========================================================= */
 
 
-async function apiGet(path) {
-  const response = await fetch(`${API_BASE}${path}`);
+/* =========================================================
+   GLOBAL STATE
+========================================================= */
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
-  }
+let currentPage = "login";
 
-  return response.json();
-}
+let currentUserRole = "citizen";
 
-const state = {
-  location: "Sector 7G, New Delhi",
-  online: true,
-  role: "citizen",
+let currentUserName = "ResQNet User";
 
-  shelter: {
-    name: "Relief Camp A",
+
+/* =========================================================
+   DEMO DATA
+========================================================= */
+
+let shelterData = {
+
+    name: "Community Relief Center",
+
     capacity: 500,
+
     occupied: 312,
-    food: "Available",
-    water: "Available",
-    medicine: "Available",
+
     doctors: 5,
-    volunteers: 18
-  }
-};
 
+    volunteers: 18,
 
-/* =========================================================
-   GLOBAL HELPERS
-========================================================= */
+    food: "Available",
 
-function showToast(message) {
-  toast.textContent = message;
-  toast.classList.remove("hidden");
+    medicine: "Available",
 
-  clearTimeout(showToast.timer);
+    water: "Available",
 
-  showToast.timer = setTimeout(() => {
-    toast.classList.add("hidden");
-  }, 2200);
-}
+    electricity: "Limited",
 
-
-function icon(name, cls = "w-5 h-5") {
-  return `<i data-lucide="${name}" class="${cls}"></i>`;
-}
-
-
-function button(label, action = "", cls = "") {
-  return `<button onclick="${action}" class="btn ${cls}">${label}</button>`;
-}
-
-
-/* =========================================================
-   MAIN MOBILE SHELL
-========================================================= */
-
-function shell(content, active = "home") {
-
-  const nav = [
-    ["home", "Home", "house"],
-    ["prepare", "Prepare", "shield-check"],
-    ["action", "Action", "asterisk"],
-    ["recover", "Recover", "briefcase-medical"],
-    ["profile", "Profile", "user-round"]
-  ];
-
-  return `
-    <div class="mobile-frame app-shell">
-
-      <header
-        class="sticky top-0 z-40 border-b border-[#e2ebe6]
-        bg-[#f8faf7]/95 px-5 py-4 backdrop-blur">
-
-        <div class="flex items-center justify-between">
-
-          <button
-            onclick="go('home')"
-            class="flex items-center gap-2 font-extrabold tracking-tight">
-
-            <span
-              class="grid h-7 w-7 place-items-center
-              rounded-full bg-ink text-xs text-white">
-
-              ${icon("shield-check", "w-4 h-4")}
-
-            </span>
-
-            ResQNet
-
-          </button>
-
-
-          <div class="flex items-center gap-2">
-
-            <button
-              onclick="changeLocation()"
-              class="rounded-full border border-[#dce7e1]
-              bg-white px-3 py-1.5 text-xs font-semibold">
-
-              ${state.location}
-
-              ${icon("chevron-down", "w-3 h-3 inline")}
-
-            </button>
-
-
-            <button
-              onclick="go('profile')"
-              class="grid h-8 w-8 place-items-center
-              rounded-full bg-ink text-white">
-
-              ${icon("user-round", "w-4 h-4")}
-
-            </button>
-
-          </div>
-
-        </div>
-
-      </header>
-
-
-      <main class="px-5 pb-28 pt-5 fade-in">
-
-        ${content}
-
-      </main>
-
-
-      <nav
-        class="fixed bottom-0 left-1/2 z-50 flex w-full
-        max-w-[440px] -translate-x-1/2 justify-around
-        border-t border-[#dce7e1] bg-white/95 px-2 py-2
-        backdrop-blur">
-
-        ${nav.map(([id, label, ico]) => `
-
-          <button
-            onclick="go('${id}')"
-            class="nav-item
-            ${active === id ? "active" : ""}
-            flex min-w-[58px] flex-col items-center gap-1
-            rounded-2xl px-3 py-2 text-[10px]
-            font-semibold text-slate-500">
-
-            ${icon(ico, "w-4 h-4")}
-
-            ${label}
-
-          </button>
-
-        `).join("")}
-
-      </nav>
-
-    </div>
-  `;
-}
-
-
-/* =========================================================
-   TITLES / STATUS
-========================================================= */
-
-function sectionTitle(kicker, title, sub = "") {
-
-  return `
-    <div class="mb-5">
-
-      <p
-        class="mb-2 text-[10px] font-extrabold uppercase
-        tracking-[.2em] text-mint">
-
-        ${kicker}
-
-      </p>
-
-      <h1
-        class="display text-3xl font-extrabold
-        leading-[1.05]">
-
-        ${title}
-
-      </h1>
-
-      ${
-        sub
-          ? `
-            <p
-              class="mt-2 max-w-md text-sm
-              leading-6 text-slate-500">
-
-              ${sub}
-
-            </p>
-          `
-          : ""
-      }
-
-    </div>
-  `;
-}
-
-
-function status(text, type = "good") {
-
-  const map = {
-
-    good:
-      "bg-[#e6faf4] text-ink",
-
-    warn:
-      "bg-[#fff3d8] text-[#8a5a00]",
-
-    bad:
-      "bg-[#ffe8ec] text-[#a81f36]",
-
-    neutral:
-      "bg-slate-100 text-slate-600"
-
-  };
-
-  return `
-    <span
-      class="rounded-full px-2.5 py-1
-      text-[10px] font-bold uppercase
-      tracking-wide ${map[type]}">
-
-      ${text}
-
-    </span>
-  `;
-}
-
-
-/* =========================================================
-   HOME DASHBOARD
-========================================================= */
-
-function home() {
-
-  const currentAlert =
-  Array.isArray(state.alerts) && state.alerts.length
-    ? state.alerts[state.alerts.length - 1]
-    : {
-        title: "No active alerts",
-        description: "No emergency alerts available."
-      };
-
-  const nearestShelter =
-    Array.isArray(state.shelters) && state.shelters.length
-      ? state.shelters[0]
-      : {
-          name: "No shelter available",
-          district: "Unknown",
-          capacity: 0
-        };
-
-  return shell(`
-
-    ${sectionTitle(
-      "Current Situation",
-      "Stay ready.<br>Stay connected.",
-      "Live emergency information based on your location."
-    )}
-
-
-    <!-- WEATHER -->
-
-    <div class="card mb-4 overflow-hidden">
-
-      <div class="flex items-center justify-between p-4">
-
-        <div>
-
-          <p
-            class="text-[10px] font-bold uppercase
-            tracking-widest text-slate-400">
-
-            Current weather
-
-          </p>
-
-          <p class="mt-1 text-2xl font-extrabold">
-            28°C
-          </p>
-
-          <p class="text-xs text-slate-500">
-            Severe rain warning
-          </p>
-
-        </div>
-
-
-        <div
-          class="grid h-12 w-12 place-items-center
-          rounded-2xl bg-[#e7f8f2] text-ink">
-
-          ${icon("cloud-rain")}
-
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <!-- HIGH PRIORITY ALERT -->
-
-    <div
-      class="mb-5 rounded-[24px] bg-coral
-      p-5 text-white shadow-soft">
-
-      <div class="flex items-start gap-3">
-
-        <div class="mt-0.5">
-          ${icon("triangle-alert", "w-5 h-5")}
-        </div>
-
-
-        <div>
-
-          <p
-            class="text-[10px] font-extrabold uppercase
-            tracking-[.18em] opacity-80">
-
-            High priority
-
-          </p>
-
-          <h2 class="mt-1 text-xl font-extrabold">
-            ${currentAlert.title}
-          </h2>
-
-          <p
-            class="mt-2 text-sm leading-5 text-white/90">
-
-            ${currentAlert.description}
-
-          </p>
-
-
-          <button
-            onclick="go('action')"
-            class="mt-4 rounded-full bg-white
-            px-4 py-2 text-xs font-extrabold text-coral">
-
-            View alert →
-
-          </button>
-
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <!-- EMERGENCY SERVICES -->
-
-    <div class="mb-5">
-
-      <div class="mb-3 flex items-end justify-between">
-
-        <h2 class="text-lg font-extrabold">
-          Emergency services
-        </h2>
-
-        <span
-          class="text-[10px] font-bold uppercase
-          tracking-widest text-slate-400">
-
-          24/7
-
-        </span>
-
-      </div>
-
-
-      <div class="grid grid-cols-3 gap-3">
-
-        ${[
-          ["Police", "shield", "bg-[#e7f8f2]"],
-          ["Ambulance", "ambulance", "bg-[#ffe8ec]"],
-          ["Fire", "flame", "bg-[#fff3d8]"]
-        ]
-          .map(
-            ([name, ico, bg]) => `
-
-              <button
-                onclick="showToast('${name} emergency call')"
-                class="card p-3 text-center">
-
-                <span
-                  class="mx-auto mb-2 grid h-10 w-10
-                  place-items-center rounded-2xl
-                  ${bg} text-ink">
-
-                  ${icon(ico, "w-5 h-5")}
-
-                </span>
-
-                <span class="text-xs font-bold">
-                  ${name}
-                </span>
-
-              </button>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-    <section class="mb-5">
-
-      <div class="mb-3 flex items-end justify-between">
-        <h2 class="text-lg font-extrabold">
-          Nearby shelter map
-        </h2>
-      </div>
-
-      <div
-        id="emergency-map"
-        class="h-64 w-full overflow-hidden rounded-[24px] border border-slate-200">
-      </div>
-
-    </section>
-
-
-    <!-- NEAREST SHELTER -->
-
-    <div class="card mb-5 overflow-hidden">
-
-      <div class="p-4">
-
-        <div class="flex items-start justify-between">
-
-          <div>
-
-            <p
-              class="text-[10px] font-extrabold uppercase
-              tracking-widest text-mint">
-
-              Nearest safe shelter
-
-            </p>
-
-            <h2 class="mt-1 text-lg font-extrabold">
-              ${nearestShelter.name}
-            </h2>
-
-            <p class="text-xs text-slate-500">
-              ${nearestShelter.district}
-            </p>
-
-          </div>
-
-          ${status("OPEN")}
-
-        </div>
-
-
-        <div class="mt-4 grid grid-cols-3 gap-2 text-center">
-
-          <div class="rounded-2xl bg-paper p-3">
-
-            <p class="text-lg font-extrabold metric">
-              ${nearestShelter.capacity}
-            </p>
-
-            <p class="text-[9px] uppercase text-slate-400">
-              spaces
-            </p>
-
-          </div>
-
-
-          <div class="rounded-2xl bg-paper p-3">
-
-            <p class="text-lg font-extrabold">
-              Food
-            </p>
-
-            <p class="text-[9px] uppercase text-slate-400">
-              available
-            </p>
-
-          </div>
-
-
-          <div class="rounded-2xl bg-paper p-3">
-
-            <p class="text-lg font-extrabold">
-              5
-            </p>
-
-            <p class="text-[9px] uppercase text-slate-400">
-              doctors
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div class="mt-3 flex gap-2">
-
-          <button
-            onclick="go('map')"
-            class="btn flex-1 rounded-full bg-ink
-            py-2.5 text-xs font-bold text-white">
-
-            Navigate
-
-          </button>
-
-
-          <button
-            onclick="go('shelter')"
-            class="btn flex-1 rounded-full
-            border border-ink py-2.5
-            text-xs font-bold text-ink">
-
-            Details
-
-          </button>
-
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <!-- LOCAL UPDATES -->
-
-    <div class="mb-4 flex items-end justify-between">
-
-      <h2 class="text-lg font-extrabold">
-        Local updates
-      </h2>
-
-      <button
-        onclick="go('action')"
-        class="text-xs font-bold text-ink">
-
-        See all →
-
-      </button>
-
-    </div>
-
-
-    <div class="space-y-3">
-
-      ${[
-        [
-          "Waterlogging reported on Main Ring Road",
-          "Traffic diverted. Expect delays of 45+ mins.",
-          "8 min ago"
-        ],
-
-        [
-          "Relief supplies arriving at Sector 5",
-          "Food and water distribution starts at 3 PM.",
-          "19 min ago"
-        ],
-
-        [
-          "Shelter Alpha currently at 80% capacity",
-          "Consider Relief Camp A instead.",
-          "31 min ago"
-        ]
-      ]
-        .map(
-          ([h, d, t]) => `
-
-            <article class="card p-4">
-
-              <div class="flex gap-3">
-
-                <span
-                  class="mt-1 h-2.5 w-2.5
-                  rounded-full bg-coral">
-                </span>
-
-                <div class="flex-1">
-
-                  <div
-                    class="flex justify-between gap-3">
-
-                    <h3 class="text-sm font-bold">
-                      ${h}
-                    </h3>
-
-                    <span
-                      class="whitespace-nowrap
-                      text-[9px] text-slate-400">
-
-                      ${t}
-
-                    </span>
-
-                  </div>
-
-                  <p
-                    class="mt-1 text-xs
-                    leading-5 text-slate-500">
-
-                    ${d}
-
-                  </p>
-
-                </div>
-
-              </div>
-
-            </article>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <!-- SOS -->
-
-    <button
-      onclick="go('sos')"
-      class="sos-pulse fixed bottom-24 right-5
-      z-40 grid h-16 w-16 place-items-center
-      rounded-full bg-coral text-sm font-black
-      text-white shadow-xl">
-
-      SOS
-
-    </button>
-
-  `, "home");
-}
-
-
-/* =========================================================
-   BEFORE DISASTER
-========================================================= */
-
-function prepare() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Before disaster",
-      "BE READY.",
-      "Know your risks. Know your route. Know what to do."
-    )}
-
-
-    <div class="space-y-3">
-
-      ${[
-        [
-          "Preparedness",
-          "shield-check",
-          "Learn how to prepare before disaster strikes.",
-          "preparedness"
-        ],
-
-        [
-          "Emergency Guides",
-          "book-open",
-          "Step-by-step instructions for emergencies.",
-          "guides"
-        ],
-
-        [
-          "Risk Awareness",
-          "activity",
-          "Understand the risks around your location.",
-          "risk"
-        ],
-
-        [
-          "Emergency Kit",
-          "backpack",
-          "Make sure you have everything you need.",
-          "kit"
-        ],
-
-        [
-          "Helpline Numbers",
-          "phone-call",
-          "Emergency contacts that work even offline.",
-          "helplines"
-        ],
-
-        [
-          "Offline Maps",
-          "map",
-          "Download essential maps before connectivity is lost.",
-          "offline"
-        ]
-      ]
-        .map(
-          ([t, ico, dest, route]) => `
-
-            <button
-              onclick="go('${route}')"
-              class="card flex w-full items-center
-              gap-4 p-4 text-left">
-
-              <span
-                class="grid h-11 w-11 shrink-0
-                place-items-center rounded-2xl
-                bg-[#e7f8f2] text-ink">
-
-                ${icon(ico)}
-
-              </span>
-
-
-              <span class="flex-1">
-
-                <b class="block text-sm">
-                  ${t}
-                </b>
-
-                <span
-                  class="text-xs leading-5
-                  text-slate-500">
-
-                  ${dest}
-
-                </span>
-
-              </span>
-
-
-              ${icon(
-                "arrow-up-right",
-                "w-4 h-4 text-slate-400"
-              )}
-
-            </button>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div class="mt-6 card p-5">
-
-      <div class="flex items-end justify-between">
-
-        <div>
-
-          <p
-            class="text-[10px] font-bold uppercase
-            tracking-widest text-mint">
-
-            Your area
-
-          </p>
-
-          <h2 class="mt-1 text-xl font-extrabold">
-            ${state.location}
-          </h2>
-
-        </div>
-
-        ${status("MODERATE", "warn")}
-
-      </div>
-
-
-      <div class="mt-5 space-y-4">
-
-        ${[
-          ["Flood", "High", "bad"],
-          ["Earthquake", "Moderate", "warn"],
-          ["Heatwave", "High", "bad"]
-        ]
-          .map(
-            ([n, v, c]) => `
-
-              <div>
-
-                <div
-                  class="mb-1 flex justify-between
-                  text-xs font-bold">
-
-                  <span>${n}</span>
-
-                  ${status(v, c)}
-
-                </div>
-
-
-                <div class="progress-track">
-
-                  <div
-                    class="progress-fill
-                    ${c === "bad" ? "bg-coral" : "bg-amber"}"
-                    style="width:${v === "High" ? 82 : 54}%">
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-
-    <div
-      class="mt-6 rounded-[24px] bg-ink
-      p-6 text-white">
-
-      <p class="text-2xl font-extrabold">
-        Preparation today can save a life tomorrow.
-      </p>
-
-      <p class="mt-2 text-sm text-white/60">
-        Keep your guides, contacts and maps ready
-        before connectivity is lost.
-      </p>
-
-    </div>
-
-  `, "prepare");
-}
-
-
-/* =========================================================
-   PREPAREDNESS
-========================================================= */
-
-function preparedness() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Preparedness",
-      "PREPARE BEFORE IT HAPPENS.",
-      "Simple actions can make an emergency safer."
-    )}
-
-
-    <div class="grid grid-cols-2 gap-3">
-
-      ${[
-        ["Flood", "cloud-rain", "Move to higher ground early."],
-        ["Earthquake", "activity", "Drop, cover and hold."],
-        ["Cyclone", "wind", "Stay indoors and away from windows."],
-        ["Landslide", "mountain", "Avoid unstable slopes."],
-        ["Heatwave", "sun", "Stay hydrated and cool."],
-        ["Fire", "flame", "Evacuate and avoid smoke."]
-      ]
-        .map(
-          ([t, i, d]) => `
-
-            <button
-              onclick="showToast('Opening ${t} guide')"
-              class="card p-4 text-left">
-
-              <span
-                class="grid h-10 w-10
-                place-items-center rounded-xl
-                bg-[#e7f8f2] text-ink">
-
-                ${icon(i)}
-
-              </span>
-
-              <h3 class="mt-3 font-extrabold">
-                ${t}
-              </h3>
-
-              <p
-                class="mt-1 text-xs
-                leading-5 text-slate-500">
-
-                ${d}
-
-              </p>
-
-              <span class="mt-3 block text-xs font-bold">
-                Learn →
-              </span>
-
-            </button>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div class="mt-6 card p-5">
-
-      <div class="flex justify-between">
-
-        <h2 class="font-extrabold">
-          Your preparation
-        </h2>
-
-        <b class="text-mint">
-          3 / 6
-        </b>
-
-      </div>
-
-
-      <div class="mt-4 space-y-3">
-
-        ${[
-          "Emergency contacts saved",
-          "First aid kit ready",
-          "Water stored",
-          "Emergency documents",
-          "Power bank charged",
-          "Offline map downloaded"
-        ]
-          .map(
-            (x, i) => `
-
-              <button
-                onclick="
-                  this.querySelector('svg')
-                  .classList.toggle('text-mint');
-                  showToast('Checklist updated')
-                "
-                class="flex w-full items-center
-                gap-3 text-left text-sm">
-
-                <span
-                  class="grid h-7 w-7 place-items-center
-                  rounded-full border
-                  ${i < 3
-                    ? "border-mint bg-[#e7f8f2]"
-                    : "border-slate-300"}">
-
-                  ${icon(
-                    i < 3 ? "check" : "circle",
-                    "w-4 h-4"
-                  )}
-
-                </span>
-
-                ${x}
-
-              </button>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-  `, "prepare");
-}
-
-
-/* =========================================================
-   EMERGENCY GUIDES
-========================================================= */
-
-function guides() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Emergency guides",
-      "KNOW WHAT TO DO.",
-      "Quick instructions for dangerous situations."
-    )}
-
-
-    <div
-      class="mb-5 flex items-center gap-2
-      rounded-full border border-[#dce7e1]
-      bg-white px-4 py-3">
-
-      ${icon(
-        "search",
-        "w-4 h-4 text-slate-400"
-      )}
-
-      <input
-        class="w-full bg-transparent
-        text-sm outline-none"
-        placeholder="Search emergency guides"
-        oninput="filterGuides(this.value)"
-      />
-
-    </div>
-
-
-    <div
-      class="mb-4 flex gap-2
-      overflow-x-auto pb-1">
-
-      ${[
-        "Flood",
-        "Earthquake",
-        "Cyclone",
-        "Fire",
-        "First Aid",
-        "Heatwave"
-      ]
-        .map(
-          x => `
-
-            <button
-              class="whitespace-nowrap
-              rounded-full border
-              border-[#dce7e1] bg-white
-              px-3 py-2 text-xs font-bold">
-
-              ${x}
-
-            </button>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div id="guideList" class="space-y-3">
-
-      ${[
-        [
-          "DURING A FLOOD",
-          "Move to higher ground · Avoid moving water · Disconnect electricity if safe",
-          "5 min",
-          "Critical"
-        ],
-
-        [
-          "EARTHQUAKE SAFETY",
-          "Drop, cover and hold · Stay away from windows",
-          "4 min",
-          "High"
-        ],
-
-        [
-          "BASIC FIRST AID",
-          "Control bleeding · Check breathing · Call emergency services",
-          "6 min",
-          "High"
-        ],
-
-        [
-          "CYCLONE SAFETY",
-          "Stay indoors · Secure loose objects · Follow official alerts",
-          "4 min",
-          "High"
-        ]
-
-      ]
-        .map(
-          ([t, d, time, u]) => `
-
-            <article class="guide-item card p-4">
-
-              <div
-                class="flex items-start
-                justify-between gap-3">
-
-                <div>
-
-                  <p
-                    class="text-[10px] font-extrabold
-                    uppercase tracking-widest text-mint">
-
-                    ${u}
-
-                  </p>
-
-                  <h3 class="mt-1 font-extrabold">
-                    ${t}
-                  </h3>
-
-                  <p
-                    class="mt-2 text-xs
-                    leading-5 text-slate-500">
-
-                    ${d}
-
-                  </p>
-
-                </div>
-
-
-                <span
-                  class="rounded-full bg-paper
-                  px-2 py-1 text-[10px] font-bold">
-
-                  ${time}
-
-                </span>
-
-              </div>
-
-
-              <button
-                onclick="showToast('Guide opened')"
-                class="mt-4 text-xs font-extrabold">
-
-                Open Guide →
-
-              </button>
-
-            </article>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div
-      class="mt-5 rounded-[24px]
-      bg-coral p-5 text-white">
-
-      <p
-        class="text-xs font-extrabold
-        uppercase tracking-widest">
-
-        Immediate danger
-
-      </p>
-
-      <h3 class="mt-1 text-xl font-extrabold">
-        Use SOS or call emergency services.
-      </h3>
-
-      <button
-        onclick="go('sos')"
-        class="mt-4 rounded-full bg-white
-        px-4 py-2 text-xs font-extrabold
-        text-coral">
-
-        Open SOS
-
-      </button>
-
-    </div>
-
-  `, "prepare");
-}
-
-
-function filterGuides(q) {
-
-  document
-    .querySelectorAll(".guide-item")
-    .forEach(el => {
-
-      el.style.display =
-        el.innerText
-          .toLowerCase()
-          .includes(q.toLowerCase())
-          ? ""
-          : "none";
-
-    });
-
-}
-
-
-/* =========================================================
-   RISK AWARENESS
-========================================================= */
-
-function risk() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Risk awareness",
-      "KNOW YOUR RISK.",
-      "Historical patterns help explain the risks around you."
-    )}
-
-
-    <div class="card p-5">
-
-      <div
-        class="flex items-start
-        justify-between">
-
-        <div>
-
-          <p
-            class="text-[10px] font-bold uppercase
-            tracking-widest text-mint">
-
-            Current location
-
-          </p>
-
-          <h2 class="mt-1 text-lg font-extrabold">
-            ${state.location}
-          </h2>
-
-        </div>
-
-        <button
-          onclick="changeLocation()"
-          class="text-xs font-bold">
-
-          Change →
-
-        </button>
-
-      </div>
-
-
-      <div
-        class="mt-5 rounded-[22px]
-        bg-ink p-5 text-white">
-
-        <p
-          class="text-[10px] font-bold uppercase
-          tracking-widest text-white/50">
-
-          Current risk
-
-        </p>
-
-        <p class="mt-1 text-4xl font-extrabold">
-          MODERATE
-        </p>
-
-        <p class="mt-2 text-xs text-white/60">
-          Based on historical incidents and current conditions.
-        </p>
-
-      </div>
-
-
-      <div class="mt-5 space-y-4">
-
-        ${[
-          ["Flood", "HIGH", 82, "bad"],
-          ["Earthquake", "MODERATE", 54, "warn"],
-          ["Heatwave", "HIGH", 78, "bad"],
-          ["Cyclone", "LOW", 28, "good"]
-        ]
-          .map(
-            ([n, v, p, c]) => `
-
-              <div>
-
-                <div
-                  class="mb-1 flex
-                  justify-between text-xs font-bold">
-
-                  <span>${n}</span>
-
-                  ${status(v, c)}
-
-                </div>
-
-                <div class="progress-track">
-
-                  <div
-                    class="progress-fill
-                    ${
-                      c === "bad"
-                        ? "bg-coral"
-                        : c === "warn"
-                        ? "bg-amber"
-                        : "bg-mint"
-                    }"
-                    style="width:${p}%">
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-5 card p-5">
-
-      <p
-        class="text-[10px] font-bold uppercase
-        tracking-widest text-mint">
-
-        Historical disaster activity
-
-      </p>
-
-      <h2 class="mt-1 text-xl font-extrabold">
-        Past 10 years
-      </h2>
-
-
-      <div
-        class="mt-5 flex h-36
-        items-end gap-2">
-
-        ${[30, 48, 35, 70, 52, 90, 60, 75, 42, 84]
-          .map(
-            (h, i) => `
-
-              <div
-                class="flex flex-1
-                flex-col justify-end">
-
-                <div
-                  class="rounded-t-md bg-ink/80"
-                  style="height:${h}%">
-                </div>
-
-                <span
-                  class="mt-1 text-center
-                  text-[8px] text-slate-400">
-
-                  ${2017 + i}
-
-                </span>
-
-              </div>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-5 grid grid-cols-2 gap-3">
-
-      <div class="card p-4">
-
-        <p class="text-[9px] uppercase text-slate-400">
-          Most common
-        </p>
-
-        <b class="text-lg">
-          Flood
-        </b>
-
-      </div>
-
-
-      <div class="card p-4">
-
-        <p class="text-[9px] uppercase text-slate-400">
-          Peak months
-        </p>
-
-        <b class="text-lg">
-          Jul–Sep
-        </b>
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-5 card p-5">
-
-      <h3 class="font-extrabold">
-        Why is this area at risk?
-      </h3>
-
-      <p
-        class="mt-2 text-sm
-        leading-6 text-slate-500">
-
-        Low-lying roads, heavy monsoon rainfall
-        and drainage pressure can increase
-        localized flooding risk.
-
-      </p>
-
-    </div>
-
-  `, "prepare");
-}
-
-
-/* =========================================================
-   EMERGENCY KIT
-========================================================= */
-
-function kit() {
-
-  const items = [
-    "Drinking water",
-    "First aid kit",
-    "Flashlight",
-    "Power bank",
-    "Batteries",
-    "Essential medicines",
-    "Dry food",
-    "Important documents",
-    "Whistle",
-    "Radio",
-    "Blanket",
-    "Cash"
-  ];
-
-  return shell(`
-
-    ${sectionTitle(
-      "Emergency kit",
-      "PACK FOR THE UNEXPECTED.",
-      "Build your emergency kit before you need it."
-    )}
-
-
-    <div class="card p-5">
-
-      <div class="flex justify-between">
-
-        <span class="text-sm font-bold">
-          Readiness
-        </span>
-
-        <b class="text-mint">
-          7 / 12 READY
-        </b>
-
-      </div>
-
-
-      <div class="progress-track mt-3">
-
-        <div
-          class="progress-fill bg-mint"
-          style="width:58%">
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-4 space-y-2">
-
-      ${items
-        .map(
-          (x, i) => `
-
-            <button
-              onclick="toggleCheck(this)"
-              class="card flex w-full items-center
-              gap-3 p-3.5 text-left">
-
-              <span
-                class="check grid h-7 w-7
-                place-items-center rounded-full
-                ${
-                  i < 7
-                    ? "bg-[#e7f8f2] text-ink"
-                    : "border border-slate-300"
-                }">
-
-                ${icon(
-                  i < 7 ? "check" : "circle",
-                  "w-4 h-4"
-                )}
-
-              </span>
-
-
-              <span class="flex-1">
-
-                <b class="text-sm">
-                  ${x}
-                </b>
-
-                <span
-                  class="block text-[10px]
-                  text-slate-400">
-
-                  ${i < 7 ? "Ready" : "Needs attention"}
-
-                </span>
-
-              </span>
-
-            </button>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div class="mt-5 card p-5">
-
-      <p
-        class="text-[10px] font-bold uppercase
-        tracking-widest text-mint">
-
-        Recommended for your area
-
-      </p>
-
-      <div class="mt-3 space-y-2 text-sm">
-
-        <p>• Waterproof document pouch</p>
-        <p>• Extra drinking water</p>
-        <p>• Waterproof flashlight</p>
-
-      </div>
-
-    </div>
-
-  `, "prepare");
-}
-
-
-function toggleCheck(el) {
-
-  el
-    .querySelector(".check")
-    .classList
-    .toggle("bg-[#e7f8f2]");
-
-  showToast("Checklist updated");
-}
-
-
-/* =========================================================
-   HELPLINES
-========================================================= */
-
-function helplines() {
-
-  const nums = [
-
-    ["Police", "112", "shield"],
-
-    ["Ambulance", "108", "ambulance"],
-
-    ["Fire", "101", "flame"],
-
-    [
-      "Disaster Management",
-      "Official Government Helpline",
-      "triangle-alert"
-    ],
-
-    [
-      "NDRF",
-      "Official Emergency Contact",
-      "radio"
-    ]
-
-  ];
-
-
-  return shell(`
-
-    ${sectionTitle(
-      "Emergency contacts",
-      "HELP IS ONE CALL AWAY.",
-      "Emergency contacts remain available even without internet."
-    )}
-
-
-    <div
-      class="rounded-[22px]
-      bg-ink p-5 text-white">
-
-      <div class="flex gap-3">
-
-        ${icon("wifi-off", "w-5 h-5")}
-
-      </div>
-
-      <p
-        class="mt-3 text-sm
-        text-white/70">
-
-        Saved locally on your device.
-        These contacts are designed to remain
-        accessible offline.
-
-      </p>
-
-    </div>
-
-
-    <div class="mt-4 space-y-3">
-
-      ${nums
-        .map(
-          ([n, num, ico]) => `
-
-            <div class="card p-4">
-
-              <div class="flex items-center gap-3">
-
-                <span
-                  class="grid h-11 w-11
-                  place-items-center rounded-2xl
-                  bg-[#e7f8f2] text-ink">
-
-                  ${icon(ico)}
-
-                </span>
-
-
-                <div class="flex-1">
-
-                  <p
-                    class="text-[10px]
-                    uppercase tracking-widest
-                    text-slate-400">
-
-                    ${n}
-
-                  </p>
-
-                  <p class="font-extrabold">
-                    ${num}
-                  </p>
-
-                </div>
-
-
-                <button
-                  onclick="showToast('Calling ${n}')"
-                  class="rounded-full bg-ink
-                  px-4 py-2 text-xs
-                  font-bold text-white">
-
-                  Call
-
-                </button>
-
-              </div>
-
-            </div>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div class="mt-5 card p-5">
-
-      <p
-        class="text-[10px] font-bold uppercase
-        tracking-widest text-mint">
-
-        Local contacts
-
-      </p>
-
-
-      <div class="mt-3 space-y-3">
-
-        ${
-          [
-            "Delhi Disaster Management",
-            "District Control Room",
-            "Nearest Police Station",
-            "Nearest Hospital"
-          ]
-            .map(
-              x => `
-
-                <button
-                  onclick="showToast('${x}')"
-                  class="flex w-full items-center
-                  justify-between border-b
-                  border-[#e6eeea] py-3
-                  text-sm font-semibold
-                  last:border-0">
-
-                  ${x}
-
-                  ${icon(
-                    "arrow-up-right",
-                    "w-4 h-4"
-                  )}
-
-                </button>
-
-              `
-            )
-            .join("")
-        }
-
-      </div>
-
-    </div>
-
-  `, "prepare");
-}
-
-
-/* =========================================================
-   OFFLINE MAPS
-========================================================= */
-
-function offline() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Offline maps",
-      "STAY CONNECTED, EVEN OFFLINE.",
-      "Download essential emergency information before connectivity is lost."
-    )}
-
-
-    <div class="card p-5">
-
-      <div class="flex justify-between">
-
-        <span class="text-sm font-bold">
-          Device storage
-        </span>
-
-        <b>
-          1.2 GB available
-        </b>
-
-      </div>
-
-
-      <div class="progress-track mt-3">
-
-        <div
-          class="progress-fill bg-ink"
-          style="width:34%">
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-4 space-y-3">
-
-      ${[
-        ["New Delhi", "82 MB", "Downloaded"],
-        ["Current Area", "34 MB", "Download"],
-        ["Nearby Districts", "120 MB", "Download"]
-      ]
-        .map(
-          ([n, s, b]) => `
-
-            <div class="card p-4">
-
-              <div class="flex items-center gap-3">
-
-                <div
-                  class="grid h-14 w-14
-                  place-items-center rounded-2xl
-                  bg-[#e7f8f2]">
-
-                  ${icon("map")}
-
-                </div>
-
-
-                <div class="flex-1">
-
-                  <b>${n}</b>
-
-                  <p class="text-xs text-slate-400">
-                    ${s}
-                  </p>
-
-                </div>
-
-
-                <button
-                  onclick="
-                    showToast(
-                      '${b === "Downloaded"
-                        ? "Map already downloaded"
-                        : "Map download started"}'
-                    )
-                  "
-                  class="
-                    rounded-full
-                    ${
-                      b === "Downloaded"
-                        ? "bg-[#e7f8f2] text-ink"
-                        : "bg-ink text-white"
-                    }
-                    px-3 py-2 text-[10px]
-                    font-bold">
-
-                  ${b}
-
-                </button>
-
-              </div>
-
-            </div>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div class="mt-5 card p-5">
-
-      <h3 class="font-extrabold">
-        Offline information included
-      </h3>
-
-
-      <div
-        class="mt-3 grid grid-cols-2
-        gap-2 text-xs">
-
-        ${[
-          "Roads",
-          "Relief shelters",
-          "Hospitals",
-          "Police",
-          "Fire stations",
-          "Medical camps",
-          "Water points",
-          "Charging"
-        ]
-          .map(
-            x => `
-              <div
-                class="rounded-xl
-                bg-paper p-3">
-
-                ✓ ${x}
-
-              </div>
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-  `, "prepare");
-}
-
-
-/* =========================================================
-   DURING DISASTER
-========================================================= */
-
-function emergency() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "During disaster",
-      "EMERGENCY MODE.",
-      "Critical information is prioritized for rapid decisions."
-    )}
-
-
-    <div
-      class="mb-4 flex items-center
-      justify-between">
-
-      <span class="text-xs font-bold">
-        ${state.location}
-      </span>
-
-      ${status("ONLINE", "good")}
-
-    </div>
-
-
-    <div
-      class="rounded-[24px]
-      bg-coral p-5 text-white">
-
-      <p
-        class="text-[10px] font-extrabold
-        uppercase tracking-widest
-        opacity-75">
-
-        High priority
-
-      </p>
-
-      <h2 class="mt-1 text-2xl font-extrabold">
-        FLASH FLOOD
-      </h2>
-
-      <p class="mt-2 text-sm text-white/85">
-        Move to higher ground immediately.
-      </p>
-
-
-      <button
-        onclick="go('map')"
-        class="mt-4 rounded-full
-        bg-white px-4 py-2
-        text-xs font-extrabold text-coral">
-
-        Open emergency map →
-
-      </button>
-
-    </div>
-
-
-    <div class="mt-4 grid grid-cols-2 gap-3">
-
-      ${[
-        ["28°C", "Temperature"],
-        ["180mm", "Rainfall"],
-        ["HIGH", "Flood risk"],
-        ["Strong", "Wind"]
-      ]
-        .map(
-          ([a, b]) => `
-
-            <div class="card p-4">
-
-              <p class="text-2xl font-extrabold">
-                ${a}
-              </p>
-
-              <p
-                class="mt-1 text-[10px]
-                uppercase tracking-widest
-                text-slate-400">
-
-                ${b}
-
-              </p>
-
-            </div>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div class="mt-5">
-
-      <div
-        class="mb-3 flex justify-between">
-
-        <h2 class="font-extrabold">
-          Nearest help
-        </h2>
-
-        <button
-          onclick="go('map')"
-          class="text-xs font-bold">
-
-          Map →
-
-        </button>
-
-      </div>
-
-
-      <div class="space-y-2">
-
-        ${[
-          ["Shelter", "1.8 km", "shelter"],
-          ["Hospital", "2.1 km", "hospital"],
-          ["Medical Camp", "3.4 km", "heart-pulse"],
-          ["Food", "1.2 km", "utensils"]
-        ]
-          .map(
-            ([a, b, i]) => `
-
-              <button
-                onclick="
-                  go(
-                    '${a === "Shelter"
-                      ? "shelter"
-                      : "map"}'
-                  )
-                "
-                class="card flex w-full
-                items-center gap-3 p-3
-                text-left">
-
-                <span
-                  class="grid h-9 w-9
-                  place-items-center
-                  rounded-xl
-                  bg-[#e7f8f2]">
-
-                  ${icon(i, "w-4 h-4")}
-
-                </span>
-
-
-                <span
-                  class="flex-1
-                  text-sm font-bold">
-
-                  ${a}
-
-                </span>
-
-
-                <span
-                  class="text-xs text-slate-400">
-
-                  ${b}
-
-                </span>
-
-
-                ${icon(
-                  "chevron-right",
-                  "w-4 h-4"
-                )}
-
-              </button>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-5">
-
-      <h2 class="mb-3 font-extrabold">
-        Live local updates
-      </h2>
-
-
-      <div class="space-y-2">
-
-        ${
-          [
-            "Road blocked — Main Ring Road",
-            "Waterlogging — Sector 5",
-            "Shelter B filling quickly"
-          ]
-            .map(
-              (x, i) => `
-
-                <div
-                  class="card p-3 text-sm">
-
-                  <span
-                    class="
-                    mr-2 inline-block
-                    h-2 w-2 rounded-full
-                    ${i === 0
-                      ? "bg-coral"
-                      : "bg-mint"}">
-                  </span>
-
-                  ${x}
-
-                </div>
-
-              `
-            )
-            .join("")
-        }
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-5 grid grid-cols-2 gap-3">
-
-      <button
-        onclick="go('map')"
-        class="rounded-2xl bg-ink
-        py-4 text-xs font-extrabold
-        text-white">
-
-        OPEN MAP
-
-      </button>
-
-
-      <button
-        onclick="go('shelter')"
-        class="rounded-2xl
-        border border-ink py-4
-        text-xs font-extrabold text-ink">
-
-        FIND SHELTER
-
-      </button>
-
-    </div>
-
-
-    <button
-      onclick="go('sos')"
-      class="mt-3 w-full
-      rounded-2xl bg-coral
-      py-4 text-xs font-extrabold
-      text-white">
-
-      SOS / REQUEST EMERGENCY HELP
-
-    </button>
-
-  `, "action");
-}
-
-
-/* =========================================================
-   MAP
-========================================================= */
-
-let emergencyMap;
-
-function initMap() {
-  const container = document.getElementById("emergency-map");
-  if (!container) return;
-
-  if (emergencyMap) {
-    emergencyMap.remove();
-  }
-
-  emergencyMap = L.map(container).setView([28.6692, 77.4538], 11);
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(emergencyMap);
-
-  // Backend shelters ko map par dikhao
-  if (Array.isArray(state.shelters)) {
-    state.shelters.forEach(shelter => {
-      if (shelter.latitude && shelter.longitude) {
-        L.marker([shelter.latitude, shelter.longitude])
-          .addTo(emergencyMap)
-          .bindPopup(`
-            <b>${shelter.name}</b><br>
-            ${shelter.district}<br>
-            Capacity: ${shelter.capacity}
-          `);
-      }
-    });
-  }
-
-  // Leaflet ko refresh force karo
-  setTimeout(() => emergencyMap.invalidateSize(), 100);
-}
-
-function mapPage() {
-  // Page render hone ke baad map initialize karo
-  setTimeout(() => initMap(), 50);
-
-  const nearestShelter =
-    Array.isArray(state.shelters) && state.shelters.length
-      ? state.shelters[0]
-      : {
-          name: "No shelter available",
-          district: "Unknown",
-          capacity: 0,
-          latitude: 28.6139,
-          longitude: 77.2090
-        };
-
-  return shell(`
-    ${sectionTitle(
-      "Emergency map",
-      "FIND HELP AROUND YOU.",
-      "Shelters, medical camps and essential resources."
-    )}
-
-    <div
-      class="mb-3 flex items-center
-      gap-2 rounded-full border
-      border-[#dce7e1] bg-white
-      px-4 py-3">
-
-      ${icon("search", "w-4 h-4 text-slate-400")}
-
-      <input
-        class="w-full bg-transparent
-        text-sm outline-none"
-        placeholder="Search location"
-      />
-
-    </div>
-
-    <div
-      class="mb-3 flex gap-2
-      overflow-x-auto pb-1">
-
-      ${[
-        "Shelters",
-        "Hospitals",
-        "Medical",
-        "Food",
-        "Water",
-        "Charging",
-        "Police",
-        "Fire",
-        "Boats"
-      ]
-        .map(
-          x => `
-            <button
-              class="whitespace-nowrap
-              rounded-full bg-white
-              px-3 py-2 text-[10px]
-              font-bold border
-              border-[#dce7e1]">
-              ${x}
-            </button>
-          `
-        )
-        .join("")}
-
-    </div>
-
-    <!-- REAL INTERACTIVE MAP -->
-    <div
-      id="map"
-      class="h-72 w-full overflow-hidden rounded-[24px] border border-slate-200 shadow-soft">
-    </div>
-
-    <div
-      class="card -mt-8 relative z-10
-      mx-3 p-4">
-
-      <div
-        class="flex items-start
-        justify-between">
-
-        <div>
-
-          <p
-            class="text-[10px]
-            font-extrabold uppercase
-            tracking-widest text-mint">
-            Nearest safe shelter
-          </p>
-
-          <h2 class="mt-1 text-lg font-extrabold">
-            ${nearestShelter.name}
-          </h2>
-
-          <p class="text-xs text-slate-500">
-            ${nearestShelter.district} · ${nearestShelter.capacity} spaces available
-          </p>
-
-        </div>
-
-        ${status("OPEN")}
-
-      </div>
-
-      <div class="mt-3 flex gap-2">
-
-        <button
-          onclick="focusShelterOnMap()"
-          class="flex-1 rounded-full bg-ink py-2.5 text-xs font-bold text-white">
-          Navigate →
-        </button>
-
-        <button
-          onclick="go('shelter')"
-          class="flex-1 rounded-full
-          border border-ink py-2.5
-          text-xs font-bold">
-
-          Details
-
-        </button>
-
-      </div>
-
-    </div>
-
-    <div class="mt-4 grid grid-cols-3 gap-2">
-
-      <button
-        onclick="showToast('Centered on current location')"
-        class="card py-3 text-xs font-bold">
-
-        ${icon("locate-fixed", "w-4 h-4 mx-auto mb-1")}
-
-        Locate
-
-      </button>
-
-      <button
-        onclick="go('ai')"
-        class="card py-3 text-xs font-bold">
-
-        ${icon("bot", "w-4 h-4 mx-auto mb-1")}
-
-        AI
-
-      </button>
-
-      <button
-        onclick="go('sos')"
-        class="card py-3 text-xs
-        font-bold text-coral">
-
-        ${icon("siren", "w-4 h-4 mx-auto mb-1")}
-
-        SOS
-
-      </button>
-
-    </div>
-  `, "map");
-}
-
-
-
-/* =========================================================
-   SHELTER DETAILS
-========================================================= */
-
-function shelter() {
-
-  const s = state.shelter;
-
-  const avail =
-    s.capacity - s.occupied;
-
-  const pct =
-    Math.round(
-      s.occupied /
-      s.capacity *
-      100
-    );
-
-
-  return shell(`
-
-    ${sectionTitle(
-      "Shelter details",
-      "RELIEF CAMP A",
-      `Official relief shelter · ${state.location}`
-    )}
-
-
-    <div class="card p-5">
-
-      <div
-        class="flex justify-between
-        items-start">
-
-        <div>
-
-          <p
-            class="text-[10px]
-            uppercase tracking-widest
-            text-slate-400">
-
-            Current status
-
-          </p>
-
-          <h2 class="mt-1 text-xl font-extrabold">
-            OPEN
-          </h2>
-
-        </div>
-
-        ${status("VERIFIED")}
-
-      </div>
-
-
-      <div
-        class="mt-5 rounded-[22px]
-        bg-paper p-5">
-
-        <div
-          class="flex items-end
-          justify-between">
-
-          <div>
-
-            <p
-              class="text-4xl
-              font-extrabold metric">
-
-              ${avail}
-
-            </p>
-
-            <p
-              class="text-xs uppercase
-              tracking-widest
-              text-slate-400">
-
-              available
-
-            </p>
-
-          </div>
-
-
-          <div class="text-right">
-
-            <p class="font-bold">
-              ${s.occupied} / ${s.capacity}
-            </p>
-
-            <p
-              class="text-[10px]
-              uppercase text-slate-400">
-
-              occupied
-
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div class="progress-track mt-4">
-
-          <div
-            class="progress-fill bg-mint"
-            style="width:${pct}%">
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div
-        class="mt-4 grid grid-cols-2
-        gap-2">
-
-        ${[
-          ["Food", s.food],
-          ["Water", s.water],
-          ["Medicine", s.medicine],
-          ["Doctors", s.doctors],
-          ["Volunteers", s.volunteers],
-          ["Beds", avail],
-          ["Electricity", "Available"],
-          ["Internet", "Available"]
-        ]
-          .map(
-            ([a, b]) => `
-
-              <div
-                class="rounded-2xl
-                border border-[#e5ede9]
-                p-3">
-
-                <p
-                  class="text-[9px]
-                  uppercase tracking-widest
-                  text-slate-400">
-
-                  ${a}
-
-                </p>
-
-                <p
-                  class="mt-1 text-sm
-                  font-extrabold">
-
-                  ${b}
-
-                </p>
-
-              </div>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-
-      <p
-        class="mt-4 text-[10px]
-        text-slate-400">
-
-        Last updated 5 minutes ago ·
-        Information verified by shelter administrator.
-
-      </p>
-
-    </div>
-
-
-    <div class="mt-4 grid grid-cols-2 gap-3">
-
-      <button
-        onclick="showToast('Navigation started')"
-        class="rounded-2xl bg-ink
-        py-4 text-xs font-extrabold
-        text-white">
-
-        NAVIGATE
-
-      </button>
-
-
-      <button
-        onclick="showToast('Help request opened')"
-        class="rounded-2xl
-        border border-ink py-4
-        text-xs font-extrabold">
-
-        REQUEST HELP
-
-      </button>
-
-    </div>
-
-  `, "action");
-}
-
-
-/* =========================================================
-   SOS
-========================================================= */
-
-function sos() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Emergency",
-      "EMERGENCY SOS.",
-      "Use this only when you need immediate assistance."
-    )}
-
-
-    <div class="card p-4 text-center">
-
-      <div
-        class="flex justify-center
-        gap-2 text-xs font-bold">
-
-        ${icon("map-pin", "w-4 h-4")}
-
-        ${state.location}
-
-      </div>
-
-
-      <p
-        class="mt-1 text-[10px]
-        text-slate-400">
-
-        GPS ACTIVE ·
-        ${state.online
-          ? "NETWORK CONNECTED"
-          : "OFFLINE MODE"}
-
-      </p>
-
-    </div>
-
-
-    <div
-      class="flex flex-col
-      items-center py-8">
-
-      <button
-        onclick="sendSOS()"
-        class="sos-pulse grid h-52 w-52
-        place-items-center rounded-full
-        bg-coral text-white shadow-xl">
-
-        <span>
-
-          <b
-            class="block text-4xl
-            font-black">
-
-            SOS
-
-          </b>
-
-          <small
-            class="mt-2 block
-            text-[9px] font-bold
-            uppercase tracking-[.18em]">
-
-            Press and hold
-
-          </small>
-
-        </span>
-
-      </button>
-
-
-      <p
-        class="mt-5 text-center
-        text-xs text-slate-500">
-
-        Hold for 3 seconds to send
-        an emergency request.
-
-      </p>
-
-    </div>
-
-
-    <div class="card p-5">
-
-      <h3 class="font-extrabold">
-
-        ${state.online
-          ? "When online"
-          : "When offline"}
-
-      </h3>
-
-
-      <div class="mt-3 space-y-2 text-sm">
-
-        ${
-          (
-            state.online
-              ? [
-                  "GPS location will be sent",
-                  "Emergency request will be sent",
-                  "Authorities will be notified"
-                ]
-              : [
-                  "Request saved locally",
-                  "GPS location saved",
-                  "Automatically sent when connection returns"
-                ]
-          )
-            .map(
-              x => `<p>✓ ${x}</p>`
-            )
-            .join("")
-        }
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-4 card p-4">
-
-      <p
-        class="text-[10px]
-        uppercase tracking-widest
-        text-mint">
-
-        Direct emergency lines
-
-      </p>
-
-
-      <div class="mt-2 grid grid-cols-3 gap-2">
-
-        ${[
-          "POLICE",
-          "AMBULANCE",
-          "FIRE"
-        ]
-          .map(
-            x => `
-
-              <button
-                onclick="
-                  showToast(
-                    'Calling ${x}'
-                  )
-                "
-                class="rounded-xl
-                border border-[#dce7e1]
-                py-3 text-[10px]
-                font-extrabold">
-
-                ${x}
-
-              </button>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-
-    <button
-      onclick="
-        showToast(
-          'Calling emergency services'
-        )
-      "
-      class="mt-3 w-full
-      rounded-2xl border border-ink
-      py-4 text-xs font-extrabold">
-
-      CALL EMERGENCY SERVICES
-
-    </button>
-
-  `, "action");
-}
-
-
-async function sendSOS() {
-
-  const sosData = {
-    type: "SOS",
-    message: "Emergency SOS",
-    timestamp: new Date().toISOString()
-  };
-
-  if (state.online) {
-
-    showToast("SOS sent — authorities notified");
-
-  } else {
-
-    await indexedDBService.queueSOS(sosData);
-
-    showToast("SOS saved offline — will sync when connected");
-  }
-}
-
-/* =========================================================
-   AI ASSISTANT
-========================================================= */
-
-function ai() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "ResQ AI",
-      "ASK WHEN YOU'RE UNSURE.",
-      "Emergency guidance based on your location and situation."
-    )}
-
-
-    <div
-      class="rounded-[22px]
-      bg-ink p-5 text-white">
-
-      <div class="flex items-center gap-3">
-
-        <span
-          class="grid h-10 w-10
-          place-items-center rounded-2xl
-          bg-mint text-ink">
-
-          ${icon("bot")}
-
-        </span>
-
-
-        <div>
-
-          <b>
-            ResQ AI
-          </b>
-
-          <p
-            class="text-xs text-white/60">
-
-            Using ${state.location}
-
-          </p>
-
-        </div>
-
-      </div>
-
-
-      <p
-        class="mt-4 text-xs
-        text-white/70">
-
-        For life-threatening emergencies,
-        call emergency services or use SOS.
-
-      </p>
-
-    </div>
-
-
-    <div class="mt-5 space-y-2">
-
-      ${[
-        "Where is the nearest shelter?",
-        "What should I do during a flood?",
-        "How do I give basic first aid?",
-        "Which emergency number should I call?",
-        "Is my area currently at risk?"
-      ]
-        .map(
-          q => `
-
-            <button
-              onclick="
-                showToast(
-                  'ResQ AI: Guidance loaded'
-                )
-              "
-              class="card w-full p-4
-              text-left text-sm
-              font-semibold">
-
-              ${q}
-
-              <span class="float-right">
-                →
-              </span>
-
-            </button>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div
-      class="mt-5 flex items-center
-      gap-2 rounded-full border
-      border-[#dce7e1] bg-white
-      p-2 pl-4">
-
-      <input
-        class="flex-1 bg-transparent
-        text-sm outline-none"
-        placeholder="Ask ResQ AI..."
-      />
-
-
-      <button
-        onclick="
-          showToast(
-            'AI response generated'
-          )
-        "
-        class="grid h-10 w-10
-        place-items-center rounded-full
-        bg-ink text-white">
-
-        ${icon("arrow-up", "w-4 h-4")}
-
-      </button>
-
-    </div>
-
-  `, "action");
-}
-
-
-/* =========================================================
-   AFTER DISASTER
-========================================================= */
-
-function recover() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "After disaster",
-      "RECOVER TOGETHER.",
-      "Find assistance. Report damage. Help your community recover."
-    )}
-
-
-    <div class="space-y-3">
-
-      ${[
-        [
-          "Medical Help",
-          "heart-pulse",
-          "Find hospitals and medical camps.",
-          "medical"
-        ],
-
-        [
-          "Missing Persons",
-          "user-search",
-          "Report or search for missing people.",
-          "missing"
-        ],
-
-        [
-          "Relief Distribution",
-          "package",
-          "Find food, water and essential supplies.",
-          "relief"
-        ],
-
-        [
-          "Damage Report",
-          "house-damage",
-          "Report damage to homes and infrastructure.",
-          "damage"
-        ],
-
-        [
-          "Recovery Resources",
-          "hand-helping",
-          "Find government and community assistance.",
-          "resources"
-        ]
-
-      ]
-        .map(
-          ([t, i, d, r]) => `
-
-            <button
-              onclick="go('${r}')"
-              class="card flex w-full
-              items-center gap-4
-              p-4 text-left">
-
-              <span
-                class="grid h-11 w-11
-                items-center place-items-center
-                rounded-2xl bg-[#e7f8f2]">
-
-                ${icon(i)}
-
-              </span>
-
-
-              <span class="flex-1">
-
-                <b class="block">
-                  ${t}
-                </b>
-
-                <span
-                  class="text-xs
-                  text-slate-500">
-
-                  ${d}
-
-                </span>
-
-              </span>
-
-
-              ${icon(
-                "arrow-up-right",
-                "w-4 h-4"
-              )}
-
-            </button>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div class="mt-6">
-
-      <div
-        class="mb-3 flex
-        justify-between">
-
-        <h2 class="font-extrabold">
-          Your reports
-        </h2>
-
-        <span class="text-xs font-bold">
-          2 active
-        </span>
-
-      </div>
-
-
-      <div class="space-y-2">
-
-        ${[
-          "Damage Report #204 — Under Review",
-          "Missing Person #108 — Submitted"
-        ]
-          .map(
-            x => `
-
-              <div
-                class="card p-4
-                text-sm font-semibold">
-
-                ${x}
-
-              </div>
-
-            `
-          )
-          .join("")}
-
-      </div>
-
-    </div>
-
-  `, "recover");
-}
-
-
-/* =========================================================
-   MEDICAL
-========================================================= */
-
-function medical() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Medical help",
-      "FIND MEDICAL HELP.",
-      "Hospitals, medical camps and ambulances near you."
-    )}
-
-
-    <div class="card p-4">
-
-      <div
-        class="flex items-center
-        gap-2 text-xs font-bold">
-
-        ${icon("map-pin", "w-4 h-4")}
-
-        ${state.location}
-
-      </div>
-
-
-      <div
-        class="mt-3 h-36
-        rounded-2xl bg-[#dce9e4]
-        editorial-grid">
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-4 space-y-3">
-
-      ${[
-        [
-          "Government Hospital",
-          "2.1 km",
-          "Emergency Department · 24/7 · Ambulance Available"
-        ],
-
-        [
-          "Medical Relief Camp",
-          "3.4 km",
-          "Doctors: 4 · Medicine Available"
-        ],
-
-        [
-          "District Clinic",
-          "4.2 km",
-          "Open · First Aid"
-        ]
-
-      ]
-        .map(
-          ([n, d, desc]) => `
-
-            <div class="card p-4">
-
-              <div
-                class="flex justify-between">
-
-                <div>
-
-                  <p
-                    class="text-[10px]
-                    uppercase tracking-widest
-                    text-mint">
-
-                    Medical
-
-                  </p>
-
-                  <h3 class="font-extrabold">
-                    ${n}
-                  </h3>
-
-                  <p
-                    class="mt-1 text-xs
-                    text-slate-500">
-
-                    ${d} · ${desc}
-
-                  </p>
-
-                </div>
-
-                ${status("OPEN")}
-
-              </div>
-
-
-              <div class="mt-3 flex gap-2">
-
-                <button
-                  onclick="
-                    showToast(
-                      'Navigation started'
-                    )
-                  "
-                  class="flex-1 rounded-full
-                  bg-ink py-2 text-xs
-                  font-bold text-white">
-
-                  Navigate
-
-                </button>
-
-
-                <button
-                  onclick="
-                    showToast(
-                      'Calling medical facility'
-                    )
-                  "
-                  class="flex-1 rounded-full
-                  border border-ink py-2
-                  text-xs font-bold">
-
-                  Call
-
-                </button>
-
-              </div>
-
-            </div>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-  `, "recover");
-}
-
-
-/* =========================================================
-   MISSING PERSONS
-========================================================= */
-
-function missing() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Missing persons",
-      "HELP FIND THEM.",
-      "Report or search for people separated during the disaster."
-    )}
-
-
-    <div class="grid grid-cols-2 gap-3">
-
-      <button
-        onclick="
-          showToast(
-            'Missing person form opened'
-          )
-        "
-        class="rounded-2xl bg-ink
-        p-5 text-left text-white">
-
-        <b>
-          Report missing
-        </b>
-
-        <span
-          class="mt-2 block
-          text-xs text-white/60">
-
-          Create a new report →
-
-        </span>
-
-      </button>
-
-
-      <button
-        onclick="
-          showToast(
-            'Search opened'
-          )
-        "
-        class="rounded-2xl
-        border border-ink
-        p-5 text-left">
-
-        <b>
-          Search
-        </b>
-
-        <span
-          class="mt-2 block
-          text-xs text-slate-500">
-
-          Find a person →
-
-        </span>
-
-      </button>
-
-    </div>
-
-
-    <div
-      class="mt-5 flex items-center
-      gap-2 rounded-full border
-      border-[#dce7e1] bg-white
-      px-4 py-3">
-
-      ${icon(
-        "search",
-        "w-4 h-4 text-slate-400"
-      )}
-
-      <input
-        class="w-full bg-transparent
-        text-sm outline-none"
-        placeholder="Name, age or location"
-      />
-
-    </div>
-
-
-    <div class="mt-4 space-y-3">
-
-      ${[
-        [
-          "Aarav Sharma",
-          "17 years",
-          "Sector 7 · 2 hours ago"
-        ],
-
-        [
-          "Meera Singh",
-          "42 years",
-          "Sector 5 · 5 hours ago"
-        ],
-
-        [
-          "Rohan Kumar",
-          "29 years",
-          "Yamuna Road · 7 hours ago"
-        ]
-
-      ]
-        .map(
-          ([n, a, l]) => `
-
-            <div
-              class="card flex items-center
-              gap-3 p-4">
-
-              <div
-                class="grid h-12 w-12
-                place-items-center
-                rounded-full bg-ink
-                text-white">
-
-                ${icon("user-round")}
-
-              </div>
-
-
-              <div class="flex-1">
-
-                <b>
-                  ${n}
-                </b>
-
-                <p
-                  class="text-xs
-                  text-slate-500">
-
-                  ${a} · ${l}
-
-                </p>
-
-              </div>
-
-
-              ${status(
-                "SEARCHING",
-                "warn"
-              )}
-
-            </div>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-  `, "recover");
-}
-
-
-/* =========================================================
-   RELIEF
-========================================================= */
-
-function relief() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Relief distribution",
-      "FIND RELIEF.",
-      "Food, water, medicine and essential supplies near you."
-    )}
-
-
-    <div class="card h-48 p-4">
-
-      <div
-        class="flex h-full items-center
-        justify-center rounded-2xl
-        bg-[#dce9e4]
-        editorial-grid
-        text-sm font-bold text-ink">
-
-        ${icon(
-          "map",
-          "w-6 h-6 mr-2"
-        )}
-
-        Resource map
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-4 space-y-3">
-
-      ${[
-        [
-          "Community Relief Center",
-          "1.4 km",
-          "Food: Available · Water: Available · Medicine: Limited"
-        ],
-
-        [
-          "Sector 5 Distribution Point",
-          "2.2 km",
-          "Food: Available · Water: Available"
-        ],
-
-        [
-          "Mobile Medical & Relief Unit",
-          "3.1 km",
-          "Medicine: Available · First Aid"
-        ]
-
-      ]
-        .map(
-          ([n, d, x]) => `
-
-            <div class="card p-4">
-
-              <p
-                class="text-[10px]
-                uppercase tracking-widest
-                text-mint">
-
-                Relief point
-
-              </p>
-
-              <h3 class="font-extrabold">
-                ${n}
-              </h3>
-
-              <p class="text-xs text-slate-400">
-                ${d}
-              </p>
-
-              <p
-                class="mt-2 text-xs
-                text-slate-500">
-
-                ${x}
-
-              </p>
-
-
-              <button
-                onclick="
-                  showToast(
-                    'Navigation started'
-                  )
-                "
-                class="mt-3 rounded-full
-                bg-ink px-4 py-2
-                text-xs font-bold
-                text-white">
-
-                Navigate →
-
-              </button>
-
-            </div>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-  `, "recover");
-}
-
-
-/* =========================================================
-   DAMAGE REPORT
-========================================================= */
-
-function damage() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Damage report",
-      "REPORT WHAT HAPPENED.",
-      "Your report helps authorities understand where help is needed."
-    )}
-
-
-    <div class="card p-5 space-y-5">
-
-      <label class="block">
-
-        <span class="label">
-          Damage type
-        </span>
-
-        <select class="field">
-
-          <option>Home</option>
-          <option>Road</option>
-          <option>Bridge</option>
-          <option>Electricity</option>
-          <option>Water</option>
-          <option>Other</option>
-
-        </select>
-
-      </label>
-
-
-      <label class="block">
-
-        <span class="label">
-          Description
-        </span>
-
-        <textarea
-          class="field h-28"
-          placeholder="Describe the damage...">
-        </textarea>
-
-      </label>
-
-
-      <div>
-
-        <span class="label">
-          Photos
-        </span>
-
-        <button
-          onclick="
-            showToast(
-              'Photo picker opened'
-            )
-          "
-          class="field flex w-full
-          items-center gap-2
-          text-left text-slate-400">
-
-          ${icon("camera")}
-
-          Upload photos
-
-        </button>
-
-      </div>
-
-
-      <div>
-
-        <span class="label">
-          Location
-        </span>
-
-        <button
-          onclick="
-            showToast(
-              'Using current location'
-            )
-          "
-          class="field flex w-full
-          items-center gap-2
-          text-left">
-
-          ${icon("map-pin")}
-
-          ${state.location}
-
-          <span
-            class="ml-auto
-            text-xs font-bold">
-
-            Use current
-
-          </span>
-
-        </button>
-
-      </div>
-
-
-      <div>
-
-        <span class="label">
-          Severity
-        </span>
-
-
-        <div
-          class="grid grid-cols-4
-          gap-2">
-
-          ${[
-            "Low",
-            "Moderate",
-            "High",
-            "Critical"
-          ]
-            .map(
-              x => `
-
-                <button
-                  class="rounded-xl
-                  border border-[#dce7e1]
-                  py-3 text-[10px]
-                  font-bold">
-
-                  ${x}
-
-                </button>
-
-              `
-            )
-            .join("")}
-
-        </div>
-
-      </div>
-
-
-      <button
-        onclick="
-          showToast(
-            'Report RN-20481 submitted'
-          )
-        "
-        class="w-full rounded-2xl
-        bg-ink py-4
-        text-xs font-extrabold
-        text-white">
-
-        SUBMIT REPORT →
-
-      </button>
-
-    </div>
-
-  `, "recover");
-}
-
-
-/* =========================================================
-   RECOVERY RESOURCES
-========================================================= */
-
-function resources() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Recovery resources",
-      "START RECOVERING.",
-      "Government, community and practical support after a disaster."
-    )}
-
-
-    <div class="space-y-3">
-
-      ${[
-        "Government Assistance",
-        "Temporary Housing",
-        "Financial Support",
-        "Food Assistance",
-        "Medical Assistance",
-        "Documentation Help",
-        "Community Support"
-      ]
-        .map(
-          x => `
-
-            <button
-              onclick="
-                showToast(
-                  '${x} opened'
-                )
-              "
-              class="card w-full p-4
-              text-left">
-
-              <div
-                class="flex items-center
-                justify-between">
-
-                <b>
-                  ${x}
-                </b>
-
-                ${icon(
-                  "arrow-up-right",
-                  "w-4 h-4"
-                )}
-
-              </div>
-
-
-              <p
-                class="mt-1 text-xs
-                text-slate-500">
-
-                Eligibility, required documents
-                and available support.
-
-              </p>
-
-            </button>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div
-      class="mt-5 rounded-[24px]
-      bg-ink p-5 text-white">
-
-      <p
-        class="text-[10px]
-        uppercase tracking-widest
-        text-mint">
-
-        Official support
-
-      </p>
-
-      <h2 class="mt-1 text-xl font-extrabold">
-        Use verified resources first.
-      </h2>
-
-      <p
-        class="mt-2 text-xs
-        leading-5 text-white/60">
-
-        This prototype will later connect
-        to official government information sources.
-
-      </p>
-
-    </div>
-
-  `, "recover");
-}
-
-
-/* =========================================================
-   SHELTER ADMIN DASHBOARD
-========================================================= */
-
-function shelterAdmin() {
-
-  const s = state.shelter;
-
-  const avail =
-    s.capacity - s.occupied;
-
-  const pct =
-    Math.round(
-      s.occupied /
-      s.capacity *
-      100
-    );
-
-
-  return `
-
-    <div class="dashboard-shell bg-paper">
-
-      <div
-        class="mx-auto max-w-[1500px]
-        px-4 py-4 md:px-8">
-
-
-        <header
-          class="flex items-center
-          justify-between border-b
-          border-[#dce7e1] pb-4">
-
-          <button
-            onclick="go('home')"
-            class="flex items-center
-            gap-2 font-extrabold">
-
-            <span
-              class="grid h-8 w-8
-              place-items-center
-              rounded-full bg-ink
-              text-white">
-
-              ${icon(
-                "shield-check",
-                "w-4 h-4"
-              )}
-
-            </span>
-
-            ResQNet
-
-          </button>
-
-
-          <div class="flex items-center gap-2">
-
-            ${status("SHELTER ADMIN")}
-
-            <button
-              onclick="go('home')"
-              class="rounded-full border
-              border-[#dce7e1]
-              bg-white px-3 py-2
-              text-xs font-bold">
-
-              Exit
-
-            </button>
-
-          </div>
-
-        </header>
-
-
-        <div
-          class="grid gap-5 py-5
-          lg:grid-cols-[220px_1fr]">
-
-
-          <aside class="sidebar space-y-2">
-
-            ${[
-              "Dashboard",
-              "Capacity",
-              "Resources",
-              "Medical",
-              "Volunteers",
-              "Requests"
-            ]
-              .map(
-                (x, i) => `
-
-                  <button
-                    onclick="
-                      showToast(
-                        '${x} section'
-                      )
-                    "
-                    class="
-                      flex w-full
-                      items-center gap-3
-                      rounded-2xl px-3 py-3
-                      text-left text-sm
-                      font-semibold
-                      ${
-                        i === 0
-                          ? "bg-ink text-white"
-                          : "hover:bg-white"
-                      }">
-
-                    ${icon(
-                      [
-                        "layout-dashboard",
-                        "gauge",
-                        "package",
-                        "heart-pulse",
-                        "users",
-                        "send"
-                      ][i],
-                      "w-4 h-4"
-                    )}
-
-                    ${x}
-
-                  </button>
-
-                `
-              )
-              .join("")}
-
-          </aside>
-
-
-          <main>
-
-            ${sectionTitle(
-              "Shelter administrator",
-              "RELIEF CAMP A",
-              "Official shelter · Sector 7G, New Delhi"
-            )}
-
-
-            <div class="mb-5 flex flex-wrap gap-2">
-
-              ${status("OPEN")}
-
-              ${status("VERIFIED")}
-
-            </div>
-
-
-            <div
-              class="grid gap-3 md:grid-cols-3">
-
-              ${[
-                ["TOTAL CAPACITY", s.capacity],
-                ["OCCUPIED", s.occupied],
-                ["AVAILABLE", avail]
-              ]
-                .map(
-                  ([a, b]) => `
-
-                    <div class="card p-5">
-
-                      <p
-                        class="text-[10px]
-                        uppercase tracking-widest
-                        text-slate-400">
-
-                        ${a}
-
-                      </p>
-
-                      <p
-                        class="mt-2 text-4xl
-                        font-extrabold metric">
-
-                        ${b}
-
-                      </p>
-
-                    </div>
-
-                  `
-                )
-                .join("")}
-
-            </div>
-
-
-            <div
-              class="mt-4 grid gap-4
-              xl:grid-cols-[1.4fr_1fr]">
-
-
-              <div class="card p-5">
-
-                <div
-                  class="flex justify-between">
-
-                  <h2 class="font-extrabold">
-                    Occupancy overview
-                  </h2>
-
-                  <span
-                    class="text-xs
-                    text-slate-400">
-
-                    ${pct}% occupied
-
-                  </span>
-
-                </div>
-
-
-                <div
-                  class="progress-track
-                  mt-5 h-4">
-
-                  <div
-                    class="progress-fill bg-mint"
-                    style="width:${pct}%">
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  class="mt-3 flex
-                  justify-between
-                  text-xs text-slate-500">
-
-                  <span>
-                    Occupied ${s.occupied}
-                  </span>
-
-                  <span>
-                    Available ${avail}
-                  </span>
-
-                </div>
-
-
-                <div
-                  class="mt-5 flex
-                  flex-wrap gap-2">
-
-                  <button
-                    onclick="updateCapacity()"
-                    class="rounded-full
-                    bg-ink px-4 py-2
-                    text-xs font-bold
-                    text-white">
-
-                    Update capacity
-
-                  </button>
-
-
-                  <button
-                    onclick="
-                      showToast(
-                        'Supply request opened'
-                      )
-                    "
-                    class="rounded-full
-                    bg-[#ffe8ec]
-                    px-4 py-2
-                    text-xs font-bold
-                    text-coral">
-
-                    Request supplies
-
-                  </button>
-
-                </div>
-
-              </div>
-
-
-              <div class="card p-5">
-
-                <h2 class="font-extrabold">
-                  Resource status
-                </h2>
-
-
-                <div
-                  class="mt-3 grid
-                  grid-cols-2 gap-2">
-
-                  ${[
-                    ["Food", s.food],
-                    ["Water", s.water],
-                    ["Medicine", s.medicine],
-                    ["Doctors", s.doctors],
-                    ["Volunteers", s.volunteers],
-                    ["Power", "Available"]
-                  ]
-                    .map(
-                      ([a, b]) => `
-
-                        <div
-                          class="rounded-2xl
-                          bg-paper p-3">
-
-                          <p
-                            class="text-[9px]
-                            uppercase
-                            text-slate-400">
-
-                            ${a}
-
-                          </p>
-
-                          <b class="text-sm">
-                            ${b}
-                          </b>
-
-                        </div>
-
-                      `
-                    )
-                    .join("")}
-
-                </div>
-
-              </div>
-
-            </div>
-
-
-            <div class="mt-4 card p-5">
-
-              <div
-                class="flex justify-between">
-
-                <h2 class="font-extrabold">
-                  Incoming help requests
-                </h2>
-
-                <button
-                  class="text-xs font-bold">
-
-                  View all →
-
-                </button>
-
-              </div>
-
-
-              <div class="mt-3 space-y-2">
-
-                ${[
-                  ["Medical assistance", 4],
-                  ["Food & Water", 12],
-                  ["Clothing & blankets", 8],
-                  ["Mental health support", 2]
-                ]
-                  .map(
-                    ([a, n]) => `
-
-                      <div
-                        class="flex items-center
-                        justify-between
-                        border-b
-                        border-[#e6eeea]
-                        py-3 last:border-0">
-
-                        <span
-                          class="text-sm
-                          font-semibold">
-
-                          ${a}
-
-                        </span>
-
-                        <b>
-                          ${n}
-                        </b>
-
-                      </div>
-
-                    `
-                  )
-                  .join("")}
-
-              </div>
-
-            </div>
-
-
-          </main>
-
-        </div>
-
-      </div>
-
-    </div>
-
-  `;
-}
-
-
-function updateCapacity() {
-
-  state.shelter.occupied =
-    Math.min(
-      state.shelter.capacity,
-      state.shelter.occupied + 1
-    );
-
-  showToast("Occupancy updated");
-
-  render();
-}
-
-
-/* =========================================================
-   GOVERNMENT COMMAND CENTER
-========================================================= */
-
-function government() {
-
-  setTimeout(
-    () => initCommandMap(),
-    50
-  );
-
-
-  return `
-
-    <div
-      class="dashboard-shell
-      bg-[#eef3f0]">
-
-
-      <div
-        class="mx-auto max-w-[1550px]
-        px-4 py-4 md:px-8">
-
-
-        <header
-          class="flex flex-wrap
-          items-center justify-between
-          gap-3 border-b
-          border-[#cfdcd6] pb-4">
-
-
-          <div>
-
-            <button
-              onclick="go('home')"
-              class="flex items-center
-              gap-2 font-extrabold">
-
-              <span
-                class="grid h-8 w-8
-                place-items-center
-                rounded-full bg-ink
-                text-white">
-
-                ${icon(
-                  "shield-check",
-                  "w-4 h-4"
-                )}
-
-              </span>
-
-              ResQNet
-
-              <span class="text-slate-400">
-                / Command Center
-              </span>
-
-            </button>
-
-          </div>
-
-
-          <div
-            class="flex items-center
-            gap-2 text-xs">
-
-            ${status("LIVE", "good")}
-
-
-            <button
-              onclick="go('home')"
-              class="rounded-full border
-              border-[#cfdcd6]
-              bg-white px-4 py-2
-              font-bold">
-
-              Citizen view
-
-            </button>
-
-          </div>
-
-        </header>
-
-
-        <div class="py-5">
-
-          ${sectionTitle(
-            "Government disaster management",
-            "INCIDENT COMMAND CENTER",
-            "Flash flood response · New Delhi · Live operational overview"
-          )}
-
-
-          <!-- STAT CARDS -->
-
-          <div
-            class="grid grid-cols-2 gap-3
-            md:grid-cols-3 xl:grid-cols-6">
-
-            ${[
-              ["ACTIVE SOS", "128", "coral"],
-              ["ACTIVE INCIDENTS", "64", "coral"],
-              ["AFFECTED PEOPLE", "14.2k", "ink"],
-              ["OPEN SHELTERS", "24", "ink"],
-              ["VOLUNTEERS", "845", "ink"],
-              ["MEDICAL CAMPS", "12", "ink"]
-            ]
-              .map(
-                ([a, b, c]) => `
-
-                  <div class="card p-4">
-
-                    <p
-                      class="text-[9px]
-                      uppercase tracking-widest
-                      text-slate-400">
-
-                      ${a}
-
-                    </p>
-
-                    <p
-                      class="mt-1 text-3xl
-                      font-extrabold
-                      ${
-                        c === "coral"
-                          ? "text-coral"
-                          : ""
-                      }
-                      metric">
-
-                      ${b}
-
-                    </p>
-
-                  </div>
-
-                `
-              )
-              .join("")}
-
-          </div>
-
-
-          <div
-            class="mt-4 grid gap-4
-            xl:grid-cols-[1fr_360px]">
-
-
-            <!-- LIVE MAP -->
-
-            <div class="card p-4">
-
-              <div
-                class="mb-3 flex
-                items-center
-                justify-between">
-
-                <h2 class="font-extrabold">
-                  Live incident map
-                </h2>
-
-                ${status("LIVE", "good")}
-
-              </div>
-
-
-              <div
-                id="commandMap"
-                class="command-map
-                rounded-[20px]">
-
-              </div>
-
-            </div>
-
-
-            <!-- RIGHT SIDE -->
-
-            <div class="space-y-4">
-
-
-              <div class="card p-5">
-
-                <div
-                  class="flex justify-between">
-
-                  <h2 class="font-extrabold">
-                    AI priority action
-                  </h2>
-
-                  ${status(
-                    "CRITICAL",
-                    "bad"
-                  )}
-
-                </div>
-
-
-                <p
-                  class="mt-3 text-sm
-                  font-bold">
-
-                  Sector 7G — 12 people
-                  require immediate rescue.
-
-                </p>
-
-
-                <p
-                  class="mt-2 text-xs
-                  leading-5 text-slate-500">
-
-                  Recommended deployment:
-                  2 rescue teams,
-                  1 ambulance,
-                  4 volunteers.
-
-                </p>
-
-
-                <button
-                  onclick="
-                    showToast(
-                      'Resource deployment queued'
-                    )
-                  "
-                  class="mt-4 w-full
-                  rounded-xl bg-coral
-                  py-3 text-xs
-                  font-extrabold
-                  text-white">
-
-                  DEPLOY RESOURCES
-                  IMMEDIATELY →
-
-                </button>
-
-              </div>
-
-
-              <div class="card p-5">
-
-                <h2 class="font-extrabold">
-                  Priority incidents
-                </h2>
-
-
-                <div class="mt-3 space-y-3">
-
-                  ${
-                    [
-                      "Bridge collapse · Sector 7G",
-                      "Medical emergency · Camp A",
-                      "Road blockage · District 4",
-                      "Power outage · District 5"
-                    ]
-                      .map(
-                        (x, i) => `
-
-                          <div
-                            class="flex gap-2
-                            text-xs">
-
-                            <span
-                              class="mt-1 h-2 w-2
-                              rounded-full
-                              ${
-                                i < 2
-                                  ? "bg-coral"
-                                  : "bg-amber"
-                              }">
-                            </span>
-
-
-                            <div>
-
-                              <b>
-                                ${x}
-                              </b>
-
-                              <p
-                                class="text-slate-400">
-
-                                ${i + 2} min ago
-
-                              </p>
-
-                            </div>
-
-                          </div>
-
-                        `
-                      )
-                      .join("")
-                  }
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-
-          <!-- BOTTOM CARDS -->
-
-          <div
-            class="mt-4 grid gap-4
-            lg:grid-cols-3">
-
-
-            <!-- SHELTER OCCUPANCY -->
-
-            <div class="card p-5">
-
-              <h2 class="font-extrabold">
-                Shelter occupancy
-              </h2>
-
-
-              <div class="mt-4 space-y-3">
-
-                ${[
-                  "Relief Camp A",
-                  "Shelter B",
-                  "Shelter C"
-                ]
-                  .map(
-                    (x, i) => `
-
-                      <div>
-
-                        <div
-                          class="flex
-                          justify-between
-                          text-xs">
-
-                          <span>
-                            ${x}
-                          </span>
-
-                          <b>
-                            ${[62, 81, 94][i]}%
-                          </b>
-
-                        </div>
-
-
-                        <div
-                          class="progress-track mt-1">
-
-                          <div
-                            class="
-                            progress-fill
-                            ${
-                              i === 2
-                                ? "bg-coral"
-                                : "bg-mint"
-                            }"
-                            style="
-                              width:${[62, 81, 94][i]}%
-                            ">
-
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                    `
-                  )
-                  .join("")}
-
-              </div>
-
-            </div>
-
-
-            <!-- RESOURCE REQUESTS -->
-
-            <div class="card p-5">
-
-              <h2 class="font-extrabold">
-                Resource requests
-              </h2>
-
-
-              <div class="mt-3 space-y-2">
-
-                ${
-                  [
-                    "Food — 14 pending",
-                    "Water — 9 pending",
-                    "Medicine — 7 pending",
-                    "Doctors — 5 pending"
-                  ]
-                    .map(
-                      x => `
-
-                        <div
-                          class="flex
-                          justify-between
-                          rounded-xl
-                          bg-paper p-3
-                          text-xs">
-
-                          <span>
-                            ${x}
-                          </span>
-
-                          ${status(
-                            "PENDING",
-                            "warn"
-                          )}
-
-                        </div>
-
-                      `
-                    )
-                    .join("")
-                }
-
-              </div>
-
-            </div>
-
-
-            <!-- SOS TRENDS -->
-
-            <div class="card p-5">
-
-              <h2 class="font-extrabold">
-                SOS trends (24h)
-              </h2>
-
-
-              <div
-                class="mt-5 flex h-24
-                items-end gap-1">
-
-                ${[
-                  18, 28, 22, 35,
-                  48, 42, 65, 72,
-                  58, 80, 68, 92
-                ]
-                  .map(
-                    h => `
-
-                      <div
-                        class="flex-1
-                        rounded-t
-                        bg-ink/80"
-                        style="
-                          height:${h}%
-                        ">
-
-                      </div>
-
-                    `
-                  )
-                  .join("")}
-
-              </div>
-
-
-              <p
-                class="mt-2 text-[10px]
-                text-slate-400">
-
-                Requests increasing
-                during peak rainfall.
-
-              </p>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-
-  `;
-}
-
-
-/* =========================================================
-   GOVERNMENT MAP
-========================================================= */
-
-function initCommandMap() {
-
-  const el =
-    document.getElementById(
-      "commandMap"
-    );
-
-
-  if (
-    !el ||
-    el.dataset.ready
-  ) {
-    return;
-  }
-
-
-  el.dataset.ready = "1";
-
-
-  const map =
-    L.map(
-      el,
-      {
-        zoomControl: false
-      }
-    )
-    .setView(
-      [28.6139, 77.2090],
-      11
-    );
-
-
-  L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-      maxZoom: 19,
-      attribution:
-        "© OpenStreetMap"
-    }
-  )
-  .addTo(map);
-
-
-  [
-    [
-      28.61,
-      77.21,
-      "CRITICAL SOS"
-    ],
-
-    [
-      28.65,
-      77.18,
-      "Flood zone"
-    ],
-
-    [
-      28.58,
-      77.25,
-      "Shelter"
-    ],
-
-    [
-      28.67,
-      77.23,
-      "Medical camp"
-    ]
-
-  ].forEach(
-    (p, i) => {
-
-      L
-        .circleMarker(
-          [p[0], p[1]],
-          {
-            radius:
-              i === 0
-                ? 11
-                : 8,
-
-            color: "#fff",
-
-            weight: 2,
-
-            fillColor:
-              i === 0
-                ? "#e84a5f"
-                : i === 1
-                ? "#f2b84b"
-                : "#00a884",
-
-            fillOpacity: 0.95
-          }
-        )
-        .addTo(map)
-        .bindPopup(
-          `<b>${p[2]}</b>`
-        );
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   PROFILE
-========================================================= */
-
-function profile() {
-
-  return shell(`
-
-    ${sectionTitle(
-      "Profile",
-      "YOUR PROFILE.",
-      "Keep your emergency information ready."
-    )}
-
-
-    <div
-      class="card flex items-center
-      gap-4 p-5">
-
-      <div
-        class="grid h-16 w-16
-        place-items-center
-        rounded-full bg-ink
-        text-white">
-
-        ${icon(
-          "user-round",
-          "w-7 h-7"
-        )}
-
-      </div>
-
-
-      <div>
-
-        <h2 class="text-lg font-extrabold">
-          Citizen Account
-        </h2>
-
-        <p
-          class="text-xs
-          text-slate-500">
-
-          Emergency profile active
-
-        </p>
-
-      </div>
-
-    </div>
-
-
-    <div class="mt-4 space-y-2">
-
-      ${[
-        [
-          "Emergency contacts",
-          "Manage contacts",
-          "phone-call"
-        ],
-
-        [
-          "Offline data",
-          "3 maps · 8 guides saved",
-          "download"
-        ],
-
-        [
-          "Notifications",
-          "Alerts enabled",
-          "bell"
-        ],
-
-        [
-          "Language",
-          "English",
-          "languages"
-        ],
-
-        [
-          "Accessibility",
-          "Default",
-          "accessibility"
-        ],
-
-        [
-          "Privacy",
-          "Manage your data",
-          "lock-keyhole"
-        ]
-
-      ]
-        .map(
-          ([a, b, i]) => `
-
-            <button
-              onclick="
-                showToast('${a}')
-              "
-              class="card flex w-full
-              items-center gap-3
-              p-4 text-left">
-
-              <span
-                class="grid h-10 w-10
-                place-items-center
-                rounded-xl
-                bg-[#e7f8f2]">
-
-                ${icon(
-                  i,
-                  "w-4 h-4"
-                )}
-
-              </span>
-
-
-              <span class="flex-1">
-
-                <b class="block text-sm">
-                  ${a}
-                </b>
-
-                <span
-                  class="text-xs
-                  text-slate-500">
-
-                  ${b}
-
-                </span>
-
-              </span>
-
-
-              ${icon(
-                "chevron-right",
-                "w-4 h-4"
-              )}
-
-            </button>
-
-          `
-        )
-        .join("")}
-
-    </div>
-
-
-    <div
-      class="mt-5 rounded-[24px]
-      bg-ink p-5 text-white">
-
-      <p
-        class="text-[10px]
-        uppercase tracking-widest
-        text-mint">
-
-        Profile status
-
-      </p>
-
-      <h2
-        class="mt-1 text-xl
-        font-extrabold">
-
-        Emergency information
-        is up to date.
-
-      </h2>
-
-    </div>
-
-  `, "profile");
-}
-
-
-/* =========================================================
-   LOGIN / ROLE SELECTION
-========================================================= */
-
-function login() {
-
-  return `
-
-    <div
-      class="min-h-screen
-      bg-ink text-white">
-
-
-      <div
-        class="mx-auto flex
-        min-h-screen max-w-5xl
-        flex-col justify-between
-        px-6 py-8 md:px-12">
-
-
-        <header
-          class="flex items-center
-          gap-2 font-extrabold">
-
-          ${icon(
-            "shield-check",
-            "w-6 h-6 text-mint"
-          )}
-
-          ResQNet
-
-        </header>
-
-
-        <main
-          class="grid gap-10 py-12
-          md:grid-cols-2
-          md:items-center">
-
-
-          <div>
-
-            <p
-              class="mb-3 text-xs
-              font-bold uppercase
-              tracking-[.25em]
-              text-mint">
-
-              Disaster management platform
-
-            </p>
-
-
-            <h1
-              class="display text-5xl
-              font-extrabold
-              leading-[.95]
-              md:text-7xl">
-
-              PREPARED.<br>
-              CONNECTED.<br>
-
-              <span class="text-mint">
-                PROTECTED.
-              </span>
-
-            </h1>
-
-
-            <p
-              class="mt-5 max-w-md
-              text-sm leading-6
-              text-white/60">
-
-              A connected emergency ecosystem
-              for citizens, shelters,
-              volunteers and authorities.
-
-            </p>
-
-          </div>
-
-
-          <div
-            class="rounded-[30px]
-            bg-white p-6
-            text-ink shadow-2xl">
-
-
-            <p
-              class="text-[10px]
-              font-bold uppercase
-              tracking-widest
-              text-mint">
-
-              Continue as
-
-            </p>
-
-
-            <div class="mt-4 space-y-3">
-
-              ${[
-                [
-                  "I NEED HELP",
-                  "Citizen / affected person",
-                  "home",
-                  "home"
-                ],
-
-                [
-                  "I MANAGE A SHELTER",
-                  "Shelter administrator",
-                  "tent",
-                  "shelter-admin"
-                ],
-
-                [
-                  "I AM AN AUTHORITY",
-                  "Government / disaster management",
-                  "landmark",
-                  "government"
-                ]
-
-              ]
-                .map(
-                  ([a, b, i, r]) => `
-
-                    <button
-                      onclick="
-                        go('${r}')
-                      "
-                      class="
-                        card flex w-full
-                        items-center gap-3
-                        p-4 text-left
-                        hover:border-ink">
-
-
-                      <span
-                        class="grid h-10 w-10
-                        place-items-center
-                        rounded-xl
-                        bg-[#e7f8f2]">
-
-                        ${icon(i)}
-
-                      </span>
-
-
-                      <span class="flex-1">
-
-                        <b class="block text-sm">
-                          ${a}
-                        </b>
-
-                        <span
-                          class="text-xs
-                          text-slate-500">
-
-                          ${b}
-
-                        </span>
-
-                      </span>
-
-
-                      ${icon(
-                        "arrow-right",
-                        "w-4 h-4"
-                      )}
-
-                    </button>
-
-                  `
-                )
-                .join("")}
-
-            </div>
-
-
-            <div
-              class="my-5 flex
-              items-center gap-3
-              text-[10px]
-              uppercase tracking-widest
-              text-slate-400">
-
-              <span
-                class="h-px flex-1
-                bg-slate-200">
-              </span>
-
-              guest
-
-              <span
-                class="h-px flex-1
-                bg-slate-200">
-              </span>
-
-            </div>
-
-
-            <button
-              onclick="go('home')"
-              class="w-full
-              rounded-2xl bg-ink
-              py-4 text-xs
-              font-extrabold
-              text-white">
-
-              CONTINUE AS GUEST
-
-            </button>
-
-          </div>
-
-        </main>
-
-
-        <footer
-          class="text-xs
-          text-white/30">
-
-          Prototype frontend ·
-          No backend connected
-
-        </footer>
-
-      </div>
-
-    </div>
-
-  `;
-}
-
-
-/* =========================================================
-   ROUTES
-========================================================= */
-
-const routes = {
-
-  home,
-
-  prepare,
-
-  preparedness,
-
-  guides,
-
-  risk,
-
-  kit,
-
-  helplines,
-
-  offline,
-
-  action: emergency,
-
-  map: mapPage,
-
-  shelter,
-
-  sos,
-
-  ai,
-
-  recover,
-
-  medical,
-
-  missing,
-
-  relief,
-
-  damage,
-
-  resources,
-
-  "shelter-admin": shelterAdmin,
-
-  government,
-
-  profile,
-
-  login
+    internet: "Available"
 
 };
 
 
 /* =========================================================
-   LOCATION
+   INITIALIZATION
 ========================================================= */
 
-function changeLocation() {
-
-  const next =
-    prompt(
-      "Enter a location:",
-      state.location
-    );
-
-
-  if (next) {
-
-    state.location = next;
-
-    showToast(
-      "Location changed"
-    );
+document.addEventListener("DOMContentLoaded", function () {
 
     render();
 
-  }
+});
+
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
+function navigate(page) {
+
+    currentPage = page;
+
+    render();
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+}
+
+
+/* =========================================================
+   MAIN RENDER
+========================================================= */
+
+function render() {
+
+    const app = document.getElementById("app");
+
+    if (!app) return;
+
+
+    /*
+       Login and Register do not use
+       the dashboard layout.
+    */
+
+    if (
+        currentPage === "login" ||
+        currentPage === "register"
+    ) {
+
+        app.innerHTML = renderPage();
+
+    }
+
+    else {
+
+        app.innerHTML = applicationLayout();
+
+    }
+
+
+    /*
+       Re-create Lucide icons
+    */
+
+    if (
+        typeof lucide !== "undefined" &&
+        lucide.createIcons
+    ) {
+
+        lucide.createIcons();
+
+    }
+
+}
+
+
+/* =========================================================
+   PAGE ROUTER
+========================================================= */
+
+function renderPage() {
+
+    switch (currentPage) {
+
+
+        /* =========================
+           AUTHENTICATION
+        ========================= */
+
+        case "login":
+
+            return loginPage();
+
+
+        case "register":
+
+            return registerPage();
+
+
+        /* =========================
+           DASHBOARD
+        ========================= */
+
+        case "dashboard":
+
+            if (currentUserRole === "shelter") {
+
+                return shelterDashboard();
+
+            }
+
+            if (currentUserRole === "government") {
+
+                return governmentDashboard();
+
+            }
+
+            return citizenDashboard();
+
+
+        /* =========================
+           CITIZEN PAGES
+        ========================= */
+
+        case "guides":
+
+            return guidesPage();
+
+
+        case "checklist":
+
+            return checklistPage();
+
+
+        case "contacts":
+
+            return contactsPage();
+
+
+        case "map":
+
+            return mapPage();
+
+
+        case "shelters":
+
+            return sheltersPage();
+
+
+        case "hospitals":
+
+            return hospitalsPage();
+
+
+        case "sos":
+
+            return sosPage();
+
+
+        case "damage":
+
+            return damagePage();
+
+
+        case "missing":
+
+            return missingPage();
+
+
+        case "help":
+
+            return helpPage();
+
+
+        /* =========================
+           SHELTER PAGES
+        ========================= */
+
+        case "governmentRequest":
+
+            return governmentRequestPage();
+
+
+        case "myShelter":
+
+            return myShelterPage();
+
+
+        /* =========================
+           GOVERNMENT PAGES
+        ========================= */
+
+        case "shelterMonitoring":
+
+            return shelterMonitoringPage();
+
+
+        case "alerts":
+
+            return alertsPage();
+
+
+        case "reports":
+
+            return reportsPage();
+
+
+        case "requests":
+
+            return requestsPage();
+
+
+        default:
+
+            return loginPage();
+
+    }
+
+}
+
+
+/* =========================================================
+   APPLICATION LAYOUT
+========================================================= */
+
+function applicationLayout() {
+
+    return `
+
+        <div class="min-h-screen flex bg-paper">
+
+
+            <!-- MOBILE OVERLAY -->
+
+            <div
+                id="mobileOverlay"
+                class="
+                    fixed
+                    inset-0
+                    bg-black/40
+                    z-40
+                    hidden
+                    md:hidden
+                "
+                onclick="closeMobileMenu()"
+            ></div>
+
+
+            <!-- SIDEBAR -->
+
+            <aside
+                id="sidebar"
+                class="
+                    fixed
+                    md:sticky
+                    top-0
+                    left-0
+                    z-50
+                    h-screen
+                    w-72
+                    bg-white
+                    border-r
+                    border-gray-100
+                    flex
+                    flex-col
+                    -translate-x-full
+                    md:translate-x-0
+                    transition-transform
+                    duration-300
+                "
+            >
+
+
+                <!-- LOGO -->
+
+                <div
+                    class="
+                        p-5
+                        border-b
+                        border-gray-100
+                    "
+                >
+
+                    <div class="
+                        flex
+                        items-center
+                        gap-3
+                    ">
+
+                        <div
+                            class="
+                                w-11
+                                h-11
+                                rounded-xl
+                                bg-ink
+                                text-white
+                                flex
+                                items-center
+                                justify-center
+                                shadow-glow
+                            "
+                        >
+
+                            <i
+                                data-lucide="shield-alert"
+                                class="w-6 h-6"
+                            ></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <h1
+                                class="
+                                    font-bold
+                                    text-xl
+                                    text-ink
+                                "
+                            >
+                                ResQNet
+                            </h1>
+
+                            <p
+                                class="
+                                    text-xs
+                                    text-gray-500
+                                "
+                            >
+                                Disaster Management
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- USER -->
+
+                <div
+                    class="
+                        mx-4
+                        mt-4
+                        p-4
+                        rounded-xl
+                        bg-paper
+                    "
+                >
+
+                    <div
+                        class="
+                            flex
+                            items-center
+                            gap-3
+                        "
+                    >
+
+                        <div
+                            class="
+                                w-10
+                                h-10
+                                rounded-full
+                                bg-ink
+                                text-white
+                                flex
+                                items-center
+                                justify-center
+                                font-bold
+                            "
+                        >
+
+                            ${getInitials(currentUserName)}
+
+                        </div>
+
+
+                        <div
+                            class="
+                                min-w-0
+                            "
+                        >
+
+                            <p
+                                class="
+                                    font-semibold
+                                    text-sm
+                                    truncate
+                                "
+                            >
+
+                                ${escapeHTML(currentUserName)}
+
+                            </p>
+
+
+                            <p
+                                class="
+                                    text-xs
+                                    text-gray-500
+                                "
+                            >
+
+                                ${getRoleName()}
+
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- NAVIGATION -->
+
+                <nav
+                    class="
+                        flex-1
+                        p-4
+                        space-y-1
+                        overflow-y-auto
+                    "
+                >
+
+                    ${getNavigation()}
+
+                </nav>
+
+
+                <!-- LOGOUT -->
+
+                <div
+                    class="
+                        p-4
+                        border-t
+                        border-gray-100
+                    "
+                >
+
+                    <button
+                        onclick="logout()"
+                        class="
+                            w-full
+                            flex
+                            items-center
+                            gap-3
+                            px-4
+                            py-3
+                            rounded-xl
+                            text-gray-600
+                            hover:bg-red-50
+                            hover:text-red-600
+                            transition
+                        "
+                    >
+
+                        <i
+                            data-lucide="log-out"
+                            class="w-5 h-5"
+                        ></i>
+
+                        <span class="font-semibold">
+                            Logout
+                        </span>
+
+                    </button>
+
+                </div>
+
+            </aside>
+
+
+            <!-- MAIN -->
+
+            <main
+                class="
+                    flex-1
+                    min-w-0
+                "
+            >
+
+                <!-- TOP BAR -->
+
+                <header
+                    class="
+                        sticky
+                        top-0
+                        z-30
+                        bg-white/95
+                        backdrop-blur
+                        border-b
+                        border-gray-100
+                        px-4
+                        md:px-8
+                        py-4
+                    "
+                >
+
+                    <div
+                        class="
+                            flex
+                            items-center
+                            justify-between
+                        "
+                    >
+
+
+                        <button
+                            onclick="toggleMobileMenu()"
+                            class="
+                                md:hidden
+                                w-10
+                                h-10
+                                rounded-xl
+                                bg-paper
+                                flex
+                                items-center
+                                justify-center
+                            "
+                        >
+
+                            <i
+                                data-lucide="menu"
+                            ></i>
+
+                        </button>
+
+
+                        <div
+                            class="
+                                hidden
+                                md:block
+                            "
+                        >
+
+                            <p
+                                class="
+                                    text-sm
+                                    text-gray-500
+                                "
+                            >
+
+                                ${getGreeting()}
+
+                            </p>
+
+                        </div>
+
+
+                        <!-- STATUS -->
+
+                        <div
+                            class="
+                                flex
+                                items-center
+                                gap-2
+                            "
+                        >
+
+                            <span
+                                class="
+                                    w-2.5
+                                    h-2.5
+                                    rounded-full
+                                    bg-green-500
+                                "
+                            ></span>
+
+                            <span
+                                class="
+                                    text-xs
+                                    md:text-sm
+                                    font-semibold
+                                    text-gray-600
+                                "
+                            >
+                                System Ready
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </header>
+
+
+                <!-- CONTENT -->
+
+                <div
+                    class="
+                        p-4
+                        md:p-8
+                        max-w-7xl
+                        mx-auto
+                    "
+                >
+
+                    <div class="fade-in">
+
+                        ${renderPage()}
+
+                    </div>
+
+                </div>
+
+            </main>
+
+        </div>
+
+    `;
 
 }
 
@@ -5277,77 +677,5996 @@ function changeLocation() {
    NAVIGATION
 ========================================================= */
 
-function go(route) {
+function getNavigation() {
 
-  location.hash = route;
+
+    /* =========================
+       CITIZEN
+    ========================= */
+
+    if (currentUserRole === "citizen") {
+
+        return `
+
+            ${navigationItem(
+                "dashboard",
+                "layout-dashboard",
+                "Dashboard"
+            )}
+
+            ${navigationItem(
+                "map",
+                "map",
+                "Emergency Map"
+            )}
+
+            ${navigationItem(
+                "sos",
+                "siren",
+                "SOS Emergency",
+                true
+            )}
+
+            ${navigationItem(
+                "shelters",
+                "home",
+                "Shelters"
+            )}
+
+            ${navigationItem(
+                "hospitals",
+                "hospital",
+                "Hospitals"
+            )}
+
+            ${navigationItem(
+                "contacts",
+                "phone",
+                "Emergency Contacts"
+            )}
+
+            ${navigationItem(
+                "guides",
+                "book-open",
+                "Disaster Guides"
+            )}
+
+            ${navigationItem(
+                "checklist",
+                "clipboard-check",
+                "Emergency Checklist"
+            )}
+
+            ${navigationItem(
+                "damage",
+                "triangle-alert",
+                "Damage Report"
+            )}
+
+            ${navigationItem(
+                "missing",
+                "user-search",
+                "Missing Persons"
+            )}
+
+            ${navigationItem(
+                "help",
+                "circle-help",
+                "Help & Support"
+            )}
+
+        `;
+
+    }
+
+
+    /* =========================
+       SHELTER
+    ========================= */
+
+    if (currentUserRole === "shelter") {
+
+        return `
+
+            ${navigationItem(
+                "dashboard",
+                "layout-dashboard",
+                "Dashboard"
+            )}
+
+            ${navigationItem(
+                "myShelter",
+                "home",
+                "My Shelter"
+            )}
+
+            ${navigationItem(
+                "map",
+                "map",
+                "Emergency Map"
+            )}
+
+            ${navigationItem(
+                "governmentRequest",
+                "hand-helping",
+                "Request Govt Help"
+            )}
+
+            ${navigationItem(
+                "contacts",
+                "phone",
+                "Emergency Contacts"
+            )}
+
+            ${navigationItem(
+                "hospitals",
+                "hospital",
+                "Hospitals"
+            )}
+
+            ${navigationItem(
+                "help",
+                "circle-help",
+                "Help & Support"
+            )}
+
+        `;
+
+    }
+
+
+    /* =========================
+       GOVERNMENT
+    ========================= */
+
+    if (currentUserRole === "government") {
+
+        return `
+
+            ${navigationItem(
+                "dashboard",
+                "layout-dashboard",
+                "Command Center"
+            )}
+
+            ${navigationItem(
+                "shelterMonitoring",
+                "home",
+                "Shelter Monitoring"
+            )}
+
+            ${navigationItem(
+                "alerts",
+                "megaphone",
+                "Emergency Alerts"
+            )}
+
+            ${navigationItem(
+                "reports",
+                "file-warning",
+                "Citizen Reports"
+            )}
+
+            ${navigationItem(
+                "requests",
+                "inbox",
+                "Resource Requests"
+            )}
+
+            ${navigationItem(
+                "missing",
+                "user-search",
+                "Missing Persons"
+            )}
+
+            ${navigationItem(
+                "map",
+                "map",
+                "Emergency Map"
+            )}
+
+            ${navigationItem(
+                "hospitals",
+                "hospital",
+                "Hospitals"
+            )}
+
+            ${navigationItem(
+                "contacts",
+                "phone",
+                "Government Contacts"
+            )}
+
+            ${navigationItem(
+                "help",
+                "circle-help",
+                "Help & Support"
+            )}
+
+        `;
+
+    }
+
+}
+
+
+function navigationItem(
+    page,
+    icon,
+    label,
+    emergency = false
+) {
+
+    const active =
+        currentPage === page
+            ? "active"
+            : "";
+
+    const emergencyClass =
+        emergency
+            ? "text-red-600"
+            : "";
+
+
+    return `
+
+        <button
+            onclick="navigate('${page}')"
+            class="
+                nav-item
+                ${active}
+                ${emergencyClass}
+                w-full
+                flex
+                items-center
+                gap-3
+                px-4
+                py-3
+                rounded-xl
+                text-left
+                text-sm
+                font-semibold
+            "
+        >
+
+            <i
+                data-lucide="${icon}"
+                class="w-5 h-5"
+            ></i>
+
+            <span>
+                ${label}
+            </span>
+
+        </button>
+
+    `;
 
 }
 
 
 /* =========================================================
-   RENDER
+   AUTHENTICATION
 ========================================================= */
 
-function render() {
+function loginPage() {
 
-  const route =
-    (
-      location.hash ||
-      "#login"
-    ).slice(1);
+    return `
+
+        <div
+            class="
+                min-h-screen
+                flex
+                items-center
+                justify-center
+                bg-paper
+                px-4
+                py-10
+            "
+        >
+
+            <div
+                class="
+                    w-full
+                    max-w-md
+                "
+            >
 
 
-  app.innerHTML =
-    (
-      routes[route] ||
-      login
-    )();
+                <!-- LOGO -->
+
+                <div
+                    class="
+                        text-center
+                        mb-8
+                    "
+                >
+
+                    <div
+                        class="
+                            w-16
+                            h-16
+                            mx-auto
+                            rounded-2xl
+                            bg-ink
+                            text-white
+                            flex
+                            items-center
+                            justify-center
+                            shadow-glow
+                        "
+                    >
+
+                        <i
+                            data-lucide="shield-alert"
+                            class="w-8 h-8"
+                        ></i>
+
+                    </div>
 
 
-  lucide.createIcons();
+                    <h1
+                        class="
+                            text-3xl
+                            font-bold
+                            text-ink
+                            mt-4
+                        "
+                    >
+                        ResQNet
+                    </h1>
+
+
+                    <p
+                        class="
+                            text-gray-500
+                            mt-2
+                        "
+                    >
+                        Disaster Management Platform
+                    </p>
+
+                </div>
+
+
+                <!-- LOGIN CARD -->
+
+                <div
+                    class="
+                        card
+                        p-6
+                        md:p-8
+                    "
+                >
+
+                    <h2
+                        class="
+                            text-2xl
+                            font-bold
+                            text-ink
+                        "
+                    >
+                        Welcome Back
+                    </h2>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                            mt-1
+                            mb-6
+                        "
+                    >
+                        Login to your ResQNet account.
+                    </p>
+
+
+                    <form
+                        onsubmit="handleLogin(event)"
+                        class="space-y-5"
+                    >
+
+
+                        <!-- ROLE -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Login As
+                            </label>
+
+
+                            <select
+                                id="loginRole"
+                                class="resq-input"
+                                required
+                            >
+
+                                <option value="citizen">
+                                    Citizen
+                                </option>
+
+                                <option value="shelter">
+                                    Shelter Representative
+                                </option>
+
+                                <option value="government">
+                                    Government / Authority
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <!-- EMAIL -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Email Address
+                            </label>
+
+
+                            <div class="relative">
+
+                                <i
+                                    data-lucide="mail"
+                                    class="
+                                        absolute
+                                        left-4
+                                        top-3.5
+                                        w-5
+                                        h-5
+                                        text-gray-400
+                                    "
+                                ></i>
+
+
+                                <input
+                                    id="loginEmail"
+                                    type="email"
+                                    class="
+                                        resq-input
+                                        pl-12
+                                    "
+                                    placeholder="Enter your email"
+                                    required
+                                >
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- PASSWORD -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Password
+                            </label>
+
+
+                            <div class="relative">
+
+                                <i
+                                    data-lucide="lock"
+                                    class="
+                                        absolute
+                                        left-4
+                                        top-3.5
+                                        w-5
+                                        h-5
+                                        text-gray-400
+                                    "
+                                ></i>
+
+
+                                <input
+                                    id="loginPassword"
+                                    type="password"
+                                    class="
+                                        resq-input
+                                        pl-12
+                                    "
+                                    placeholder="Enter password"
+                                    required
+                                >
+
+                            </div>
+
+                        </div>
+
+
+                        <button
+                            type="submit"
+                            class="
+                                resq-button
+                                w-full
+                                bg-ink
+                                text-white
+                                py-3.5
+                                rounded-xl
+                                font-bold
+                            "
+                        >
+
+                            <i
+                                data-lucide="log-in"
+                                class="w-5 h-5 inline"
+                            ></i>
+
+                            Login
+
+                        </button>
+
+                    </form>
+
+
+                    <div
+                        class="
+                            text-center
+                            mt-6
+                            pt-6
+                            border-t
+                            border-gray-100
+                        "
+                    >
+
+                        <p
+                            class="
+                                text-sm
+                                text-gray-500
+                            "
+                        >
+
+                            Don't have an account?
+
+                            <button
+                                onclick="navigate('register')"
+                                class="
+                                    font-bold
+                                    text-ink
+                                    ml-1
+                                "
+                            >
+                                Create Account
+                            </button>
+
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
 
 }
 
 
-window.addEventListener(
-  "hashchange",
-  render
-);
+function registerPage() {
+
+    return `
+
+        <div
+            class="
+                min-h-screen
+                flex
+                items-center
+                justify-center
+                bg-paper
+                px-4
+                py-10
+            "
+        >
+
+            <div
+                class="
+                    w-full
+                    max-w-lg
+                "
+            >
 
 
-async function connectBackend() {
-  try {
-    // Fetch live data from FastAPI
-    state.shelters = await apiGet("/maps/shelters/");
-    state.hospitals = await apiGet("/emergency/hospitals/");
+                <div
+                    class="
+                        text-center
+                        mb-8
+                    "
+                >
 
-    state.alerts = await apiGet("/recovery/alerts/");
+                    <div
+                        class="
+                            w-16
+                            h-16
+                            mx-auto
+                            rounded-2xl
+                            bg-ink
+                            text-white
+                            flex
+                            items-center
+                            justify-center
+                        "
+                    >
 
-    // Latest alert displayed on frontend
-    if (state.alerts.length) {
-      state.activeAlert =
-        state.alerts[state.alerts.length - 1];
+                        <i
+                            data-lucide="shield-alert"
+                            class="w-8 h-8"
+                        ></i>
+
+                    </div>
+
+
+                    <h1
+                        class="
+                            text-3xl
+                            font-bold
+                            text-ink
+                            mt-4
+                        "
+                    >
+                        ResQNet
+                    </h1>
+
+
+                    <p
+                        class="
+                            text-gray-500
+                            mt-2
+                        "
+                    >
+                        Create your account
+                    </p>
+
+                </div>
+
+
+                <div
+                    class="
+                        card
+                        p-6
+                        md:p-8
+                    "
+                >
+
+                    <h2
+                        class="
+                            text-2xl
+                            font-bold
+                            text-ink
+                        "
+                    >
+                        Create Account
+                    </h2>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                            mt-1
+                            mb-6
+                        "
+                    >
+                        Select the account type you need.
+                    </p>
+
+
+                    <form
+                        onsubmit="handleRegister(event)"
+                        class="space-y-5"
+                    >
+
+
+                        <!-- ROLE -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Account Type
+                            </label>
+
+
+                            <select
+                                id="registerRole"
+                                class="resq-input"
+                                onchange="showRoleFields()"
+                                required
+                            >
+
+                                <option value="">
+                                    Select account type
+                                </option>
+
+                                <option value="citizen">
+                                    Citizen
+                                </option>
+
+                                <option value="shelter">
+                                    Shelter Representative
+                                </option>
+
+                                <option value="government">
+                                    Government / Authority
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <!-- NAME -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Full Name
+                            </label>
+
+
+                            <input
+                                id="registerName"
+                                type="text"
+                                class="resq-input"
+                                placeholder="Enter your name"
+                                required
+                            >
+
+                        </div>
+
+
+                        <!-- ORGANIZATION -->
+
+                        <div
+                            id="organizationField"
+                            class="hidden"
+                        >
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Organization / Shelter Name
+                            </label>
+
+
+                            <input
+                                id="registerOrganization"
+                                class="resq-input"
+                                placeholder="Enter organization name"
+                            >
+
+                        </div>
+
+
+                        <!-- EMAIL -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Email Address
+                            </label>
+
+
+                            <input
+                                id="registerEmail"
+                                type="email"
+                                class="resq-input"
+                                placeholder="Enter email"
+                                required
+                            >
+
+                        </div>
+
+
+                        <!-- PHONE -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Phone Number
+                            </label>
+
+
+                            <input
+                                id="registerPhone"
+                                type="tel"
+                                class="resq-input"
+                                placeholder="Enter phone number"
+                                required
+                            >
+
+                        </div>
+
+
+                        <!-- PASSWORD -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Password
+                            </label>
+
+
+                            <input
+                                id="registerPassword"
+                                type="password"
+                                class="resq-input"
+                                placeholder="Create password"
+                                required
+                            >
+
+                        </div>
+
+
+                        <!-- CONFIRM -->
+
+                        <div>
+
+                            <label
+                                class="
+                                    block
+                                    text-sm
+                                    font-semibold
+                                    mb-2
+                                "
+                            >
+                                Confirm Password
+                            </label>
+
+
+                            <input
+                                id="registerConfirmPassword"
+                                type="password"
+                                class="resq-input"
+                                placeholder="Confirm password"
+                                required
+                            >
+
+                        </div>
+
+
+                        <label
+                            class="
+                                flex
+                                items-start
+                                gap-3
+                                text-sm
+                                text-gray-600
+                            "
+                        >
+
+                            <input
+                                type="checkbox"
+                                required
+                                class="mt-1"
+                            >
+
+                            <span>
+                                I agree to the ResQNet terms
+                                and emergency service guidelines.
+                            </span>
+
+                        </label>
+
+
+                        <button
+                            type="submit"
+                            class="
+                                w-full
+                                bg-ink
+                                text-white
+                                py-3.5
+                                rounded-xl
+                                font-bold
+                            "
+                        >
+
+                            <i
+                                data-lucide="user-plus"
+                                class="w-5 h-5 inline"
+                            ></i>
+
+                            Create Account
+
+                        </button>
+
+                    </form>
+
+
+                    <div
+                        class="
+                            text-center
+                            mt-6
+                            pt-6
+                            border-t
+                        "
+                    >
+
+                        <p
+                            class="
+                                text-sm
+                                text-gray-500
+                            "
+                        >
+
+                            Already have an account?
+
+                            <button
+                                onclick="navigate('login')"
+                                class="
+                                    font-bold
+                                    text-ink
+                                "
+                            >
+                                Login
+                            </button>
+
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   LOGIN / REGISTER HANDLERS
+========================================================= */
+
+function handleLogin(event) {
+
+    event.preventDefault();
+
+
+    const email =
+        document.getElementById("loginEmail").value.trim();
+
+    const password =
+        document.getElementById("loginPassword").value;
+
+    const role =
+        document.getElementById("loginRole").value;
+
+
+    if (
+        !email ||
+        !password ||
+        !role
+    ) {
+
+        showToast(
+            "Please fill all fields"
+        );
+
+        return;
+
     }
 
-    state.guides =
-      await apiGet("/preparedness/guides/");
 
-    console.log("Live Data Loaded");
+    currentUserRole = role;
 
-    render();
-    initMap();
-  } catch (error) {
-    console.error(
-      "Backend connection failed:",
-      error
+
+    /*
+       For UI demo purposes,
+       name is generated from email.
+    */
+
+    currentUserName =
+        email
+            .split("@")[0]
+            .replace(/[._-]/g, " ");
+
+
+    currentUserName =
+        currentUserName
+            .split(" ")
+            .map(
+                word =>
+                    word.charAt(0).toUpperCase() +
+                    word.slice(1)
+            )
+            .join(" ");
+
+
+    showToast(
+        "Login successful"
     );
-  }
+
+
+    setTimeout(
+        function () {
+
+            navigate("dashboard");
+
+        },
+        400
+    );
+
 }
-// Run once when the page opens
-connectBackend();
 
 
-render();
+function handleRegister(event) {
+
+    event.preventDefault();
 
 
+    const role =
+        document.getElementById("registerRole").value;
 
+    const name =
+        document.getElementById("registerName").value.trim();
+
+    const password =
+        document.getElementById("registerPassword").value;
+
+    const confirmPassword =
+        document.getElementById(
+            "registerConfirmPassword"
+        ).value;
+
+
+    if (
+        !role ||
+        !name
+    ) {
+
+        showToast(
+            "Please fill all required fields"
+        );
+
+        return;
+
+    }
+
+
+    if (
+        password.length < 6
+    ) {
+
+        showToast(
+            "Password must contain at least 6 characters"
+        );
+
+        return;
+
+    }
+
+
+    if (
+        password !== confirmPassword
+    ) {
+
+        showToast(
+            "Passwords do not match"
+        );
+
+        return;
+
+    }
+
+
+    currentUserRole = role;
+
+    currentUserName = name;
+
+
+    showToast(
+        "Account created successfully"
+    );
+
+
+    setTimeout(
+        function () {
+
+            navigate("dashboard");
+
+        },
+        500
+    );
+
+}
+
+
+function showRoleFields() {
+
+    const roleElement =
+        document.getElementById(
+            "registerRole"
+        );
+
+    const organizationField =
+        document.getElementById(
+            "organizationField"
+        );
+
+
+    if (
+        !roleElement ||
+        !organizationField
+    ) {
+
+        return;
+
+    }
+
+
+    const role =
+        roleElement.value;
+
+
+    if (
+        role === "shelter" ||
+        role === "government"
+    ) {
+
+        organizationField.classList.remove(
+            "hidden"
+        );
+
+    }
+
+    else {
+
+        organizationField.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   CITIZEN DASHBOARD
+========================================================= */
+
+function citizenDashboard() {
+
+    return `
+
+        ${pageHeader(
+            "Citizen Dashboard",
+            "Your emergency information and assistance center."
+        )}
+
+
+        <!-- EMERGENCY BANNER -->
+
+        <div
+            class="
+                card
+                p-5
+                mb-6
+                border-l-4
+                border-coral
+                bg-white
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    flex-col
+                    md:flex-row
+                    md:items-center
+                    md:justify-between
+                    gap-4
+                "
+            >
+
+                <div
+                    class="
+                        flex
+                        items-start
+                        gap-4
+                    "
+                >
+
+                    <div
+                        class="
+                            w-12
+                            h-12
+                            rounded-xl
+                            bg-red-100
+                            text-coral
+                            flex
+                            items-center
+                            justify-center
+                            shrink-0
+                        "
+                    >
+
+                        <i
+                            data-lucide="triangle-alert"
+                        ></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <h2
+                            class="
+                                font-bold
+                                text-lg
+                            "
+                        >
+                            Stay Prepared
+                        </h2>
+
+
+                        <p
+                            class="
+                                text-sm
+                                text-gray-500
+                                mt-1
+                            "
+                        >
+                            Check emergency alerts and
+                            know your nearest shelter.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    onclick="navigate('sos')"
+                    class="
+                        bg-coral
+                        text-white
+                        px-5
+                        py-3
+                        rounded-xl
+                        font-bold
+                    "
+                >
+                    Emergency SOS
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- QUICK ACTIONS -->
+
+        <div
+            class="
+                grid
+                grid-cols-2
+                md:grid-cols-4
+                gap-4
+                mb-6
+            "
+        >
+
+            ${quickAction(
+                "Emergency Map",
+                "map",
+                "navigate('map')"
+            )}
+
+            ${quickAction(
+                "Find Shelter",
+                "home",
+                "navigate('shelters')"
+            )}
+
+            ${quickAction(
+                "Hospitals",
+                "hospital",
+                "navigate('hospitals')"
+            )}
+
+            ${quickAction(
+                "SOS",
+                "siren",
+                "navigate('sos')"
+            )}
+
+        </div>
+
+
+        <!-- INFO CARDS -->
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                lg:grid-cols-2
+                gap-6
+            "
+        >
+
+
+            <!-- NEAREST SHELTER -->
+
+            <div class="card p-6">
+
+                <div
+                    class="
+                        flex
+                        items-center
+                        justify-between
+                        mb-5
+                    "
+                >
+
+                    <div>
+
+                        <h2
+                            class="
+                                text-xl
+                                font-bold
+                            "
+                        >
+                            Nearest Shelter
+                        </h2>
+
+                        <p
+                            class="
+                                text-sm
+                                text-gray-500
+                            "
+                        >
+                            Available emergency accommodation
+                        </p>
+
+                    </div>
+
+
+                    <i
+                        data-lucide="home"
+                        class="
+                            text-mint
+                        "
+                    ></i>
+
+                </div>
+
+
+                <div
+                    class="
+                        p-4
+                        bg-paper
+                        rounded-xl
+                    "
+                >
+
+                    <h3 class="font-bold">
+                        Community Relief Center
+                    </h3>
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                            mt-1
+                        "
+                    >
+                        1.8 km away
+                    </p>
+
+
+                    <div
+                        class="
+                            flex
+                            items-center
+                            justify-between
+                            mt-4
+                        "
+                    >
+
+                        <span
+                            class="
+                                text-sm
+                                text-green-700
+                                font-semibold
+                            "
+                        >
+                            188 spaces available
+                        </span>
+
+
+                        <button
+                            onclick="navigate('shelters')"
+                            class="
+                                text-sm
+                                font-bold
+                                text-ink
+                            "
+                        >
+                            View
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- EMERGENCY CONTACTS -->
+
+            <div class="card p-6">
+
+                <div
+                    class="
+                        flex
+                        items-center
+                        justify-between
+                        mb-5
+                    "
+                >
+
+                    <div>
+
+                        <h2
+                            class="
+                                text-xl
+                                font-bold
+                            "
+                        >
+                            Emergency Contacts
+                        </h2>
+
+                        <p
+                            class="
+                                text-sm
+                                text-gray-500
+                            "
+                        >
+                            Important emergency services
+                        </p>
+
+                    </div>
+
+
+                    <i
+                        data-lucide="phone"
+                        class="
+                            text-mint
+                        "
+                    ></i>
+
+                </div>
+
+
+                ${contactRow(
+                    "National Emergency",
+                    "112",
+                    "phone"
+                )}
+
+                ${contactRow(
+                    "Police",
+                    "100",
+                    "shield"
+                )}
+
+                ${contactRow(
+                    "Ambulance",
+                    "108",
+                    "ambulance"
+                )}
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   SHELTER REPRESENTATIVE DASHBOARD
+========================================================= */
+
+function shelterDashboard() {
+
+    const available =
+        Math.max(
+            shelterData.capacity -
+            shelterData.occupied,
+            0
+        );
+
+
+    const occupancy =
+        shelterData.capacity > 0
+            ? Math.round(
+                (
+                    shelterData.occupied /
+                    shelterData.capacity
+                ) * 100
+            )
+            : 0;
+
+
+    return `
+
+        ${pageHeader(
+            "Shelter Representative Dashboard",
+            "Manage your shelter and request emergency assistance."
+        )}
+
+
+        <!-- SHELTER HEADER -->
+
+        <div class="card p-6 mb-6">
+
+            <div
+                class="
+                    flex
+                    flex-col
+                    md:flex-row
+                    md:items-center
+                    md:justify-between
+                    gap-4
+                "
+            >
+
+                <div>
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                        "
+                    >
+                        Current Shelter
+                    </p>
+
+
+                    <h2
+                        class="
+                            text-2xl
+                            font-bold
+                            text-ink
+                            mt-1
+                        "
+                    >
+                        ${shelterData.name}
+                    </h2>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                            mt-1
+                        "
+                    >
+                        Shelter Representative
+                    </p>
+
+                </div>
+
+
+                <span
+                    class="
+                        bg-green-100
+                        text-green-700
+                        px-4
+                        py-2
+                        rounded-full
+                        text-sm
+                        font-bold
+                    "
+                >
+                    SHELTER ACTIVE
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <!-- STATS -->
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                sm:grid-cols-2
+                xl:grid-cols-4
+                gap-5
+                mb-6
+            "
+        >
+
+            ${statCard(
+                "Total Capacity",
+                shelterData.capacity,
+                "People",
+                "users"
+            )}
+
+            ${statCard(
+                "Occupied",
+                shelterData.occupied,
+                "People staying",
+                "user-check"
+            )}
+
+            ${statCard(
+                "Available",
+                available,
+                "Spaces remaining",
+                "bed"
+            )}
+
+            ${statCard(
+                "Volunteers",
+                shelterData.volunteers,
+                "Currently available",
+                "heart-handshake"
+            )}
+
+        </div>
+
+
+        <!-- OCCUPANCY -->
+
+        <div class="card p-6 mb-6">
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    mb-3
+                "
+            >
+
+                <h3 class="font-bold">
+                    Shelter Occupancy
+                </h3>
+
+
+                <span class="font-bold">
+                    ${occupancy}%
+                </span>
+
+            </div>
+
+
+            <div class="progress-track">
+
+                <div
+                    class="progress-fill bg-mint"
+                    style="width:${occupancy}%"
+                ></div>
+
+            </div>
+
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    mt-3
+                    text-sm
+                    text-gray-500
+                "
+            >
+
+                <span>
+                    ${shelterData.occupied} occupied
+                </span>
+
+                <span>
+                    ${available} spaces available
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <!-- UPDATE + RESOURCES -->
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                lg:grid-cols-2
+                gap-6
+                mb-6
+            "
+        >
+
+
+            <!-- UPDATE -->
+
+            <div class="card p-6">
+
+                <h2
+                    class="
+                        text-xl
+                        font-bold
+                        mb-5
+                    "
+                >
+                    Update Shelter Details
+                </h2>
+
+
+                <form
+                    onsubmit="updateShelter(event)"
+                    class="space-y-4"
+                >
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Maximum Capacity
+                        </label>
+
+
+                        <input
+                            id="shelterCapacity"
+                            type="number"
+                            min="0"
+                            value="${shelterData.capacity}"
+                            class="resq-input"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Current Occupancy
+                        </label>
+
+
+                        <input
+                            id="shelterOccupancy"
+                            type="number"
+                            min="0"
+                            value="${shelterData.occupied}"
+                            class="resq-input"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Doctors Available
+                        </label>
+
+
+                        <input
+                            id="shelterDoctors"
+                            type="number"
+                            min="0"
+                            value="${shelterData.doctors}"
+                            class="resq-input"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Volunteers
+                        </label>
+
+
+                        <input
+                            id="shelterVolunteers"
+                            type="number"
+                            min="0"
+                            value="${shelterData.volunteers}"
+                            class="resq-input"
+                            required
+                        >
+
+                    </div>
+
+
+                    <button
+                        type="submit"
+                        class="
+                            w-full
+                            bg-ink
+                            text-white
+                            py-3
+                            rounded-xl
+                            font-bold
+                        "
+                    >
+
+                        <i
+                            data-lucide="save"
+                            class="w-4 h-4 inline"
+                        ></i>
+
+                        Update Shelter
+
+                    </button>
+
+                </form>
+
+            </div>
+
+
+            <!-- RESOURCES -->
+
+            <div class="card p-6">
+
+                <h2
+                    class="
+                        text-xl
+                        font-bold
+                        mb-5
+                    "
+                >
+                    Resource Availability
+                </h2>
+
+
+                ${resourceRow(
+                    "utensils",
+                    "Food",
+                    shelterData.food
+                )}
+
+                ${resourceRow(
+                    "pill",
+                    "Medicine",
+                    shelterData.medicine
+                )}
+
+                ${resourceRow(
+                    "droplets",
+                    "Clean Water",
+                    shelterData.water
+                )}
+
+                ${resourceRow(
+                    "zap",
+                    "Electricity",
+                    shelterData.electricity
+                )}
+
+                ${resourceRow(
+                    "wifi",
+                    "Internet",
+                    shelterData.internet
+                )}
+
+            </div>
+
+        </div>
+
+
+        <!-- GOVERNMENT HELP -->
+
+        <div
+            class="
+                card
+                p-6
+                border
+                border-amber-200
+                bg-amber-50
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    flex-col
+                    md:flex-row
+                    md:items-center
+                    gap-5
+                "
+            >
+
+                <div
+                    class="
+                        w-12
+                        h-12
+                        rounded-xl
+                        bg-amber-100
+                        text-amber-700
+                        flex
+                        items-center
+                        justify-center
+                        shrink-0
+                    "
+                >
+
+                    <i
+                        data-lucide="hand-helping"
+                    ></i>
+
+                </div>
+
+
+                <div class="flex-1">
+
+                    <h2
+                        class="
+                            text-xl
+                            font-bold
+                        "
+                    >
+                        Need Government Assistance?
+                    </h2>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-600
+                            mt-1
+                        "
+                    >
+                        Request food, medicine,
+                        volunteers, rescue equipment
+                        or other emergency resources.
+                    </p>
+
+
+                    <button
+                        onclick="navigate('governmentRequest')"
+                        class="
+                            mt-4
+                            bg-ink
+                            text-white
+                            px-5
+                            py-3
+                            rounded-xl
+                            font-bold
+                        "
+                    >
+
+                        Request Government Help
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   MY SHELTER
+========================================================= */
+
+function myShelterPage() {
+
+    return shelterDashboard();
+
+}
+
+
+/* =========================================================
+   SHELTER UPDATE
+========================================================= */
+
+function updateShelter(event) {
+
+    event.preventDefault();
+
+
+    const capacity =
+        Number(
+            document.getElementById(
+                "shelterCapacity"
+            ).value
+        );
+
+
+    const occupied =
+        Number(
+            document.getElementById(
+                "shelterOccupancy"
+            ).value
+        );
+
+
+    const doctors =
+        Number(
+            document.getElementById(
+                "shelterDoctors"
+            ).value
+        );
+
+
+    const volunteers =
+        Number(
+            document.getElementById(
+                "shelterVolunteers"
+            ).value
+        );
+
+
+    if (capacity < 0 || occupied < 0) {
+
+        showToast(
+            "Values cannot be negative"
+        );
+
+        return;
+
+    }
+
+
+    if (occupied > capacity) {
+
+        showToast(
+            "Occupancy cannot exceed capacity"
+        );
+
+        return;
+
+    }
+
+
+    shelterData.capacity = capacity;
+
+    shelterData.occupied = occupied;
+
+    shelterData.doctors = doctors;
+
+    shelterData.volunteers = volunteers;
+
+
+    showToast(
+        "Shelter details updated"
+    );
+
+
+    setTimeout(
+        function () {
+
+            render();
+
+        },
+        500
+    );
+
+}
+
+
+/* =========================================================
+   GOVERNMENT REQUEST PAGE
+========================================================= */
+
+function governmentRequestPage() {
+
+    return `
+
+        ${pageHeader(
+            "Request Government Assistance",
+            "Send a resource request to the relevant government authority."
+        )}
+
+
+        <div
+            class="
+                max-w-3xl
+                mx-auto
+            "
+        >
+
+            <div class="card p-6 md:p-8">
+
+                <div
+                    class="
+                        p-4
+                        rounded-xl
+                        bg-paper
+                        mb-6
+                    "
+                >
+
+                    <p
+                        class="
+                            text-xs
+                            text-gray-500
+                            uppercase
+                            font-bold
+                        "
+                    >
+                        Requesting Shelter
+                    </p>
+
+
+                    <p
+                        class="
+                            font-bold
+                            text-ink
+                            mt-1
+                        "
+                    >
+                        ${shelterData.name}
+                    </p>
+
+                </div>
+
+
+                <form
+                    onsubmit="submitGovernmentRequest(event)"
+                    class="space-y-5"
+                >
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Assistance Required
+                        </label>
+
+
+                        <select
+                            id="requestType"
+                            class="resq-input"
+                            required
+                        >
+
+                            <option value="">
+                                Select resource
+                            </option>
+
+                            <option>
+                                Food
+                            </option>
+
+                            <option>
+                                Drinking Water
+                            </option>
+
+                            <option>
+                                Medicines
+                            </option>
+
+                            <option>
+                                Doctors
+                            </option>
+
+                            <option>
+                                Volunteers
+                            </option>
+
+                            <option>
+                                Rescue Equipment
+                            </option>
+
+                            <option>
+                                Boats
+                            </option>
+
+                            <option>
+                                Generator
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Quantity Required
+                        </label>
+
+
+                        <input
+                            id="requestQuantity"
+                            type="number"
+                            min="1"
+                            class="resq-input"
+                            placeholder="Enter quantity"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Priority
+                        </label>
+
+
+                        <select
+                            id="requestPriority"
+                            class="resq-input"
+                        >
+
+                            <option>
+                                Normal
+                            </option>
+
+                            <option>
+                                High
+                            </option>
+
+                            <option>
+                                Critical
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Additional Details
+                        </label>
+
+
+                        <textarea
+                            id="requestDetails"
+                            class="resq-input"
+                            rows="5"
+                            placeholder="Describe what assistance is required..."
+                        ></textarea>
+
+                    </div>
+
+
+                    <button
+                        type="submit"
+                        class="
+                            w-full
+                            bg-ink
+                            text-white
+                            py-3
+                            rounded-xl
+                            font-bold
+                        "
+                    >
+
+                        <i
+                            data-lucide="send"
+                            class="w-4 h-4 inline"
+                        ></i>
+
+                        Send Request
+
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function submitGovernmentRequest(event) {
+
+    event.preventDefault();
+
+
+    const resource =
+        document.getElementById(
+            "requestType"
+        ).value;
+
+
+    if (!resource) {
+
+        showToast(
+            "Please select a resource"
+        );
+
+        return;
+
+    }
+
+
+    showToast(
+        "Government assistance request submitted"
+    );
+
+
+    setTimeout(
+        function () {
+
+            navigate("dashboard");
+
+        },
+        700
+    );
+
+}
+
+
+/* =========================================================
+   GOVERNMENT DASHBOARD
+========================================================= */
+
+function governmentDashboard() {
+
+    return `
+
+        ${pageHeader(
+            "Government Emergency Command Center",
+            "Monitor disasters, shelters, citizen reports and resource requests."
+        )}
+
+
+        <!-- OVERVIEW -->
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                sm:grid-cols-2
+                xl:grid-cols-4
+                gap-5
+                mb-6
+            "
+        >
+
+            ${statCard(
+                "Active Shelters",
+                "24",
+                "Currently operating",
+                "home"
+            )}
+
+            ${statCard(
+                "People Sheltered",
+                "8,421",
+                "Across all shelters",
+                "users"
+            )}
+
+            ${statCard(
+                "Pending Requests",
+                "17",
+                "Need attention",
+                "bell-ring"
+            )}
+
+            ${statCard(
+                "Active Emergencies",
+                "6",
+                "Currently monitored",
+                "triangle-alert"
+            )}
+
+        </div>
+
+
+        <!-- ALERT -->
+
+        <div
+            class="
+                card
+                p-6
+                mb-6
+                border-l-4
+                border-coral
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    flex-col
+                    md:flex-row
+                    md:items-center
+                    md:justify-between
+                    gap-4
+                "
+            >
+
+                <div
+                    class="
+                        flex
+                        items-start
+                        gap-4
+                    "
+                >
+
+                    <div
+                        class="
+                            w-11
+                            h-11
+                            rounded-xl
+                            bg-red-100
+                            text-coral
+                            flex
+                            items-center
+                            justify-center
+                        "
+                    >
+
+                        <i
+                            data-lucide="triangle-alert"
+                        ></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <h3 class="font-bold">
+                            Active Disaster Alert
+                        </h3>
+
+
+                        <p
+                            class="
+                                text-sm
+                                text-gray-500
+                                mt-1
+                            "
+                        >
+                            Flood emergency reported
+                            in multiple areas.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    onclick="navigate('alerts')"
+                    class="
+                        bg-coral
+                        text-white
+                        px-5
+                        py-2.5
+                        rounded-xl
+                        font-bold
+                    "
+                >
+                    Manage Alert
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- REQUESTS + REPORTS -->
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                lg:grid-cols-2
+                gap-6
+                mb-6
+            "
+        >
+
+
+            <!-- REQUESTS -->
+
+            <div class="card p-6">
+
+                <div
+                    class="
+                        flex
+                        justify-between
+                        items-center
+                        mb-5
+                    "
+                >
+
+                    <div>
+
+                        <h2
+                            class="
+                                text-xl
+                                font-bold
+                            "
+                        >
+                            Resource Requests
+                        </h2>
+
+
+                        <p
+                            class="
+                                text-sm
+                                text-gray-500
+                            "
+                        >
+                            Requests from shelters
+                        </p>
+
+                    </div>
+
+
+                    <span
+                        class="
+                            bg-red-100
+                            text-red-700
+                            px-3
+                            py-1
+                            rounded-full
+                            text-xs
+                            font-bold
+                        "
+                    >
+                        17 Pending
+                    </span>
+
+                </div>
+
+
+                ${governmentRequestItem(
+                    "Community Relief Center",
+                    "Medicine",
+                    "Critical"
+                )}
+
+
+                ${governmentRequestItem(
+                    "Government School Camp",
+                    "Drinking Water",
+                    "High"
+                )}
+
+
+                ${governmentRequestItem(
+                    "District Emergency Shelter",
+                    "Volunteers",
+                    "Normal"
+                )}
+
+
+                <button
+                    onclick="navigate('requests')"
+                    class="
+                        w-full
+                        mt-4
+                        bg-paper
+                        py-3
+                        rounded-xl
+                        font-bold
+                        text-ink
+                    "
+                >
+                    View All Requests
+                </button>
+
+            </div>
+
+
+            <!-- REPORTS -->
+
+            <div class="card p-6">
+
+                <h2
+                    class="
+                        text-xl
+                        font-bold
+                        mb-1
+                    "
+                >
+                    Citizen Reports
+                </h2>
+
+
+                <p
+                    class="
+                        text-sm
+                        text-gray-500
+                        mb-5
+                    "
+                >
+                    Recently submitted reports
+                </p>
+
+
+                ${reportItem(
+                    "Damage Report",
+                    "Road blocked near Sector 18",
+                    "High"
+                )}
+
+
+                ${reportItem(
+                    "Missing Person",
+                    "Missing person reported",
+                    "Critical"
+                )}
+
+
+                ${reportItem(
+                    "Damage Report",
+                    "Building damage reported",
+                    "Normal"
+                )}
+
+
+                <button
+                    onclick="navigate('reports')"
+                    class="
+                        w-full
+                        mt-4
+                        bg-paper
+                        py-3
+                        rounded-xl
+                        font-bold
+                        text-ink
+                    "
+                >
+                    View All Reports
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- COMMAND CENTER -->
+
+        <div class="card p-6">
+
+            <h2
+                class="
+                    text-xl
+                    font-bold
+                    mb-5
+                "
+            >
+                Command Center
+            </h2>
+
+
+            <div
+                class="
+                    grid
+                    grid-cols-2
+                    md:grid-cols-4
+                    gap-4
+                "
+            >
+
+                ${quickAction(
+                    "Shelter Monitoring",
+                    "home",
+                    "navigate('shelterMonitoring')"
+                )}
+
+
+                ${quickAction(
+                    "Emergency Alerts",
+                    "megaphone",
+                    "navigate('alerts')"
+                )}
+
+
+                ${quickAction(
+                    "Citizen Reports",
+                    "file-text",
+                    "navigate('reports')"
+                )}
+
+
+                ${quickAction(
+                    "Emergency Map",
+                    "map",
+                    "navigate('map')"
+                )}
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   GOVERNMENT REQUEST CARD
+========================================================= */
+
+function governmentRequestItem(
+    shelter,
+    request,
+    priority
+) {
+
+    let priorityClass =
+        "bg-gray-100 text-gray-700";
+
+
+    if (priority === "Critical") {
+
+        priorityClass =
+            "bg-red-100 text-red-700";
+
+    }
+
+    else if (priority === "High") {
+
+        priorityClass =
+            "bg-amber-100 text-amber-700";
+
+    }
+
+
+    return `
+
+        <div
+            class="
+                p-4
+                rounded-xl
+                bg-paper
+                mb-3
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    gap-3
+                "
+            >
+
+                <div>
+
+                    <p class="font-bold">
+                        ${shelter}
+                    </p>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                        "
+                    >
+                        Requires ${request}
+                    </p>
+
+                </div>
+
+
+                <span
+                    class="
+                        ${priorityClass}
+                        px-2
+                        py-1
+                        rounded-full
+                        text-xs
+                        font-bold
+                        h-fit
+                    "
+                >
+                    ${priority}
+                </span>
+
+            </div>
+
+
+            <div
+                class="
+                    flex
+                    gap-2
+                    mt-3
+                "
+            >
+
+                <button
+                    onclick="
+                        approveRequest('${shelter}')
+                    "
+                    class="
+                        flex-1
+                        bg-ink
+                        text-white
+                        py-2
+                        rounded-lg
+                        text-sm
+                        font-bold
+                    "
+                >
+                    Approve
+                </button>
+
+
+                <button
+                    onclick="
+                        assignRequest('${shelter}')
+                    "
+                    class="
+                        flex-1
+                        bg-white
+                        border
+                        py-2
+                        rounded-lg
+                        text-sm
+                        font-bold
+                    "
+                >
+                    Assign
+                </button>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function approveRequest(shelter) {
+
+    showToast(
+        `Request from ${shelter} approved`
+    );
+
+}
+
+
+function assignRequest(shelter) {
+
+    showToast(
+        `Request assigned from ${shelter}`
+    );
+
+}
+
+
+/* =========================================================
+   SHELTER MONITORING
+========================================================= */
+
+function shelterMonitoringPage() {
+
+    const shelters = [
+
+        [
+            "Community Relief Center",
+            500,
+            312
+        ],
+
+        [
+            "Government School Camp",
+            350,
+            210
+        ],
+
+        [
+            "District Emergency Shelter",
+            700,
+            420
+        ],
+
+        [
+            "City Relief Center",
+            450,
+            430
+        ]
+
+    ];
+
+
+    return `
+
+        ${pageHeader(
+            "Shelter Monitoring",
+            "Monitor capacity and resource availability across relief shelters."
+        )}
+
+
+        <div
+            class="
+                card
+                overflow-hidden
+            "
+        >
+
+            <div class="overflow-x-auto">
+
+                <table
+                    class="
+                        w-full
+                        text-sm
+                    "
+                >
+
+                    <thead
+                        class="
+                            bg-paper
+                        "
+                    >
+
+                        <tr>
+
+                            <th
+                                class="
+                                    text-left
+                                    p-4
+                                "
+                            >
+                                Shelter
+                            </th>
+
+
+                            <th
+                                class="
+                                    text-left
+                                    p-4
+                                "
+                            >
+                                Capacity
+                            </th>
+
+
+                            <th
+                                class="
+                                    text-left
+                                    p-4
+                                "
+                            >
+                                Occupied
+                            </th>
+
+
+                            <th
+                                class="
+                                    text-left
+                                    p-4
+                                "
+                            >
+                                Available
+                            </th>
+
+
+                            <th
+                                class="
+                                    text-left
+                                    p-4
+                                "
+                            >
+                                Status
+                            </th>
+
+
+                            <th
+                                class="
+                                    text-left
+                                    p-4
+                                "
+                            >
+                                Action
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        ${shelters.map(
+                            function (shelter) {
+
+                                const available =
+                                    shelter[1] -
+                                    shelter[2];
+
+
+                                return `
+
+                                    <tr
+                                        class="
+                                            border-t
+                                            border-gray-100
+                                        "
+                                    >
+
+                                        <td
+                                            class="
+                                                p-4
+                                                font-semibold
+                                            "
+                                        >
+                                            ${shelter[0]}
+                                        </td>
+
+
+                                        <td class="p-4">
+                                            ${shelter[1]}
+                                        </td>
+
+
+                                        <td class="p-4">
+                                            ${shelter[2]}
+                                        </td>
+
+
+                                        <td class="p-4">
+                                            ${available}
+                                        </td>
+
+
+                                        <td class="p-4">
+
+                                            <span
+                                                class="
+                                                    px-2
+                                                    py-1
+                                                    rounded-full
+                                                    bg-green-100
+                                                    text-green-700
+                                                    text-xs
+                                                    font-bold
+                                                "
+                                            >
+                                                Active
+                                            </span>
+
+                                        </td>
+
+
+                                        <td class="p-4">
+
+                                            <button
+                                                onclick="
+                                                    showToast(
+                                                        'Shelter details opened'
+                                                    )
+                                                "
+                                                class="
+                                                    text-ink
+                                                    font-bold
+                                                "
+                                            >
+                                                View
+                                            </button>
+
+                                        </td>
+
+                                    </tr>
+
+                                `;
+
+                            }
+                        ).join("")}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   GOVERNMENT ALERTS
+========================================================= */
+
+function alertsPage() {
+
+    return `
+
+        ${pageHeader(
+            "Emergency Alerts",
+            "Create and manage disaster alerts for affected areas."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                lg:grid-cols-2
+                gap-6
+            "
+        >
+
+
+            <!-- CREATE ALERT -->
+
+            <div class="card p-6">
+
+                <h2
+                    class="
+                        text-xl
+                        font-bold
+                        mb-5
+                    "
+                >
+                    Create Emergency Alert
+                </h2>
+
+
+                <form
+                    onsubmit="createAlert(event)"
+                    class="space-y-4"
+                >
+
+                    <input
+                        id="alertTitle"
+                        class="resq-input"
+                        placeholder="Alert title"
+                        required
+                    >
+
+
+                    <select
+                        id="alertType"
+                        class="resq-input"
+                    >
+
+                        <option>
+                            Flood
+                        </option>
+
+                        <option>
+                            Cyclone
+                        </option>
+
+                        <option>
+                            Earthquake
+                        </option>
+
+                        <option>
+                            Landslide
+                        </option>
+
+                        <option>
+                            Fire
+                        </option>
+
+                        <option>
+                            Other
+                        </option>
+
+                    </select>
+
+
+                    <input
+                        id="alertArea"
+                        class="resq-input"
+                        placeholder="Affected area"
+                        required
+                    >
+
+
+                    <textarea
+                        id="alertMessage"
+                        class="resq-input"
+                        rows="5"
+                        placeholder="Emergency message"
+                        required
+                    ></textarea>
+
+
+                    <button
+                        type="submit"
+                        class="
+                            w-full
+                            bg-coral
+                            text-white
+                            py-3
+                            rounded-xl
+                            font-bold
+                        "
+                    >
+
+                        Publish Emergency Alert
+
+                    </button>
+
+                </form>
+
+            </div>
+
+
+            <!-- ACTIVE ALERT -->
+
+            <div class="card p-6">
+
+                <h2
+                    class="
+                        text-xl
+                        font-bold
+                        mb-5
+                    "
+                >
+                    Active Alerts
+                </h2>
+
+
+                <div
+                    class="
+                        p-5
+                        bg-red-50
+                        rounded-xl
+                        border
+                        border-red-100
+                    "
+                >
+
+                    <div
+                        class="
+                            flex
+                            items-center
+                            gap-3
+                        "
+                    >
+
+                        <i
+                            data-lucide="triangle-alert"
+                            class="text-coral"
+                        ></i>
+
+
+                        <p class="font-bold">
+                            Flood Warning
+                        </p>
+
+                    </div>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-600
+                            mt-3
+                        "
+                    >
+                        Residents in low-lying areas
+                        should move to designated
+                        shelters.
+                    </p>
+
+
+                    <div
+                        class="
+                            flex
+                            gap-3
+                            mt-4
+                        "
+                    >
+
+                        <button
+                            onclick="
+                                showToast(
+                                    'Alert updated'
+                                )
+                            "
+                            class="
+                                text-sm
+                                font-bold
+                                text-ink
+                            "
+                        >
+                            Edit Alert
+                        </button>
+
+
+                        <button
+                            onclick="
+                                showToast(
+                                    'Alert cancelled'
+                                )
+                            "
+                            class="
+                                text-sm
+                                font-bold
+                                text-red-600
+                            "
+                        >
+                            Cancel
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function createAlert(event) {
+
+    event.preventDefault();
+
+
+    const title =
+        document.getElementById(
+            "alertTitle"
+        ).value.trim();
+
+
+    if (!title) {
+
+        showToast(
+            "Please enter an alert title"
+        );
+
+        return;
+
+    }
+
+
+    showToast(
+        "Emergency alert published"
+    );
+
+}
+
+
+/* =========================================================
+   GOVERNMENT REPORTS
+========================================================= */
+
+function reportsPage() {
+
+    return `
+
+        ${pageHeader(
+            "Citizen Reports",
+            "Review damage, emergency and public safety reports."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                md:grid-cols-2
+                xl:grid-cols-3
+                gap-5
+            "
+        >
+
+            ${largeReportCard(
+                "Damage Report",
+                "Road blocked near Sector 18",
+                "High",
+                "map-pin"
+            )}
+
+
+            ${largeReportCard(
+                "Missing Person",
+                "Missing person reported by citizen",
+                "Critical",
+                "user-search"
+            )}
+
+
+            ${largeReportCard(
+                "Damage Report",
+                "Building damage reported",
+                "Normal",
+                "building"
+            )}
+
+
+            ${largeReportCard(
+                "SOS Request",
+                "Emergency assistance requested",
+                "Critical",
+                "siren"
+            )}
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   GOVERNMENT REQUESTS
+========================================================= */
+
+function requestsPage() {
+
+    return `
+
+        ${pageHeader(
+            "Resource Requests",
+            "Review and manage requests submitted by shelters."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                lg:grid-cols-2
+                gap-5
+            "
+        >
+
+            ${governmentRequestItem(
+                "Community Relief Center",
+                "Medicine",
+                "Critical"
+            )}
+
+
+            ${governmentRequestItem(
+                "Government School Camp",
+                "Drinking Water",
+                "High"
+            )}
+
+
+            ${governmentRequestItem(
+                "District Emergency Shelter",
+                "Volunteers",
+                "Normal"
+            )}
+
+
+            ${governmentRequestItem(
+                "City Relief Center",
+                "Food",
+                "High"
+            )}
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   CITIZEN GUIDES
+========================================================= */
+
+function guidesPage() {
+
+    return `
+
+        ${pageHeader(
+            "Disaster Preparedness Guides",
+            "Learn what to do before, during and after a disaster."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                md:grid-cols-2
+                xl:grid-cols-3
+                gap-5
+            "
+        >
+
+            ${guideCard(
+                "Flood",
+                "droplets",
+                "Learn how to prepare for flooding, stay safe and evacuate."
+            )}
+
+
+            ${guideCard(
+                "Earthquake",
+                "activity",
+                "Learn the Drop, Cover and Hold On safety procedure."
+            )}
+
+
+            ${guideCard(
+                "Cyclone",
+                "wind",
+                "Prepare your home and follow evacuation instructions."
+            )}
+
+
+            ${guideCard(
+                "Fire",
+                "flame",
+                "Learn fire evacuation and emergency response procedures."
+            )}
+
+
+            ${guideCard(
+                "Landslide",
+                "mountain",
+                "Understand landslide warning signs and safe evacuation."
+            )}
+
+
+            ${guideCard(
+                "Heatwave",
+                "sun",
+                "Protect yourself from extreme temperatures."
+            )}
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   CHECKLIST
+========================================================= */
+
+function checklistPage() {
+
+    return `
+
+        ${pageHeader(
+            "Emergency Checklist",
+            "Keep essential items ready before a disaster."
+        )}
+
+
+        <div class="card p-6 max-w-3xl">
+
+            <h2
+                class="
+                    text-xl
+                    font-bold
+                    mb-5
+                "
+            >
+                Emergency Kit
+            </h2>
+
+
+            ${checkItem(
+                "Drinking water"
+            )}
+
+
+            ${checkItem(
+                "First aid kit"
+            )}
+
+
+            ${checkItem(
+                "Torch / flashlight"
+            )}
+
+
+            ${checkItem(
+                "Power bank"
+            )}
+
+
+            ${checkItem(
+                "Important documents"
+            )}
+
+
+            ${checkItem(
+                "Emergency medicines"
+            )}
+
+
+            ${checkItem(
+                "Non-perishable food"
+            )}
+
+
+            ${checkItem(
+                "Battery-powered radio"
+            )}
+
+        </div>
+
+    `;
+
+}
+
+
+function checkItem(text) {
+
+    return `
+
+        <label
+            class="
+                flex
+                items-center
+                gap-3
+                p-4
+                rounded-xl
+                bg-paper
+                mb-3
+                cursor-pointer
+            "
+        >
+
+            <input
+                type="checkbox"
+                class="w-5 h-5"
+            >
+
+
+            <span
+                class="
+                    text-sm
+                    font-semibold
+                "
+            >
+                ${text}
+            </span>
+
+        </label>
+
+    `;
+
+}
+
+
+/* =========================================================
+   CONTACTS
+========================================================= */
+
+function contactsPage() {
+
+    return `
+
+        ${pageHeader(
+            "Emergency Contacts",
+            "Important emergency services and support contacts."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                md:grid-cols-2
+                gap-5
+            "
+        >
+
+            ${contactCard(
+                "National Emergency",
+                "112",
+                "Emergency assistance",
+                "phone"
+            )}
+
+
+            ${contactCard(
+                "Police",
+                "100",
+                "Police emergency",
+                "shield"
+            )}
+
+
+            ${contactCard(
+                "Ambulance",
+                "108",
+                "Medical emergency",
+                "ambulance"
+            )}
+
+
+            ${contactCard(
+                "Fire Department",
+                "101",
+                "Fire emergency",
+                "flame"
+            )}
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   MAP
+========================================================= */
+
+function mapPage() {
+
+    return `
+
+        ${pageHeader(
+            "Emergency Map",
+            "Locate shelters, hospitals and emergency resources."
+        )}
+
+
+        <div class="card p-4">
+
+            <div
+                id="resqMap"
+                class="command-map bg-gray-200"
+            ></div>
+
+        </div>
+
+
+        <div
+            class="
+                grid
+                grid-cols-2
+                md:grid-cols-4
+                gap-4
+                mt-5
+            "
+        >
+
+            ${mapLegend(
+                "home",
+                "Shelters"
+            )}
+
+
+            ${mapLegend(
+                "hospital",
+                "Hospitals"
+            )}
+
+
+            ${mapLegend(
+                "droplets",
+                "Water"
+            )}
+
+
+            ${mapLegend(
+                "heart-pulse",
+                "Medical Camps"
+            )}
+
+        </div>
+
+        <script>
+
+            setTimeout(function () {
+
+                if (
+                    typeof L !== "undefined" &&
+                    document.getElementById("resqMap")
+                ) {
+
+                    const map =
+                        L.map("resqMap")
+                        .setView(
+                            [28.6139, 77.2090],
+                            11
+                        );
+
+                    L.tileLayer(
+                        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                        {
+                            attribution:
+                                "&copy; OpenStreetMap contributors"
+                        }
+                    ).addTo(map);
+
+
+                    const locations = [
+
+                        {
+                            lat: 28.6200,
+                            lng: 77.2100,
+                            title:
+                                "Community Relief Center"
+                        },
+
+                        {
+                            lat: 28.6000,
+                            lng: 77.2300,
+                            title:
+                                "Emergency Hospital"
+                        },
+
+                        {
+                            lat: 28.6400,
+                            lng: 77.1900,
+                            title:
+                                "Medical Camp"
+                        }
+
+                    ];
+
+
+                    locations.forEach(function (location) {
+
+                        L.marker([
+                            location.lat,
+                            location.lng
+                        ])
+                        .addTo(map)
+                        .bindPopup(
+                            "<b>" +
+                            location.title +
+                            "</b>"
+                        );
+
+                    });
+
+                }
+
+            }, 200);
+
+        </script>
+
+    `;
+
+}
+
+
+/* =========================================================
+   SHELTERS
+========================================================= */
+
+function sheltersPage() {
+
+    return `
+
+        ${pageHeader(
+            "Emergency Shelters",
+            "Find nearby relief shelters and available capacity."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                md:grid-cols-2
+                xl:grid-cols-3
+                gap-5
+            "
+        >
+
+            ${shelterCard(
+                "Community Relief Center",
+                "1.8 km",
+                500,
+                312
+            )}
+
+
+            ${shelterCard(
+                "Government School Camp",
+                "3.2 km",
+                350,
+                210
+            )}
+
+
+            ${shelterCard(
+                "District Emergency Shelter",
+                "4.7 km",
+                700,
+                420
+            )}
+
+
+            ${shelterCard(
+                "City Relief Center",
+                "5.1 km",
+                450,
+                430
+            )}
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   HOSPITALS
+========================================================= */
+
+function hospitalsPage() {
+
+    return `
+
+        ${pageHeader(
+            "Emergency Hospitals",
+            "Find hospitals and medical assistance."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                md:grid-cols-2
+                gap-5
+            "
+        >
+
+            ${hospitalCard(
+                "District General Hospital",
+                "2.4 km",
+                "Emergency",
+                "24/7"
+            )}
+
+
+            ${hospitalCard(
+                "City Medical Center",
+                "4.1 km",
+                "Emergency",
+                "24/7"
+            )}
+
+
+            ${hospitalCard(
+                "Community Health Center",
+                "5.6 km",
+                "Medical Assistance",
+                "Open"
+            )}
+
+
+            ${hospitalCard(
+                "Red Cross Medical Camp",
+                "3.8 km",
+                "Disaster Relief",
+                "Active"
+            )}
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   SOS
+========================================================= */
+
+function sosPage() {
+
+    return `
+
+        ${pageHeader(
+            "Emergency SOS",
+            "Use SOS only when you need immediate assistance."
+        )}
+
+
+        <div
+            class="
+                max-w-2xl
+                mx-auto
+                text-center
+            "
+        >
+
+            <div
+                class="
+                    card
+                    p-8
+                    md:p-12
+                "
+            >
+
+                <div
+                    class="
+                        w-28
+                        h-28
+                        mx-auto
+                        rounded-full
+                        bg-red-100
+                        text-coral
+                        flex
+                        items-center
+                        justify-center
+                        sos-button
+                    "
+                >
+
+                    <i
+                        data-lucide="siren"
+                        class="w-14 h-14"
+                    ></i>
+
+                </div>
+
+
+                <h2
+                    class="
+                        text-3xl
+                        font-bold
+                        mt-6
+                    "
+                >
+                    Emergency SOS
+                </h2>
+
+
+                <p
+                    class="
+                        text-gray-500
+                        mt-3
+                    "
+                >
+                    Your emergency request will be
+                    prepared with your current location.
+                </p>
+
+
+                <button
+                    onclick="triggerSOS()"
+                    class="
+                        mt-8
+                        w-full
+                        bg-coral
+                        text-white
+                        py-4
+                        rounded-xl
+                        font-bold
+                        text-lg
+                        sos-button
+                    "
+                >
+
+                    <i
+                        data-lucide="siren"
+                        class="w-5 h-5 inline"
+                    ></i>
+
+                    SEND SOS
+
+                </button>
+
+
+                <p
+                    class="
+                        text-xs
+                        text-gray-400
+                        mt-4
+                    "
+                >
+                    Use only for genuine emergencies.
+                </p>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function triggerSOS() {
+
+    showToast(
+        "Emergency SOS request prepared"
+    );
+
+}
+
+
+/* =========================================================
+   DAMAGE REPORT
+========================================================= */
+
+function damagePage() {
+
+    return `
+
+        ${pageHeader(
+            "Damage Report",
+            "Report damage caused by a disaster."
+        )}
+
+
+        <div class="max-w-3xl mx-auto">
+
+            <div class="card p-6 md:p-8">
+
+                <form
+                    onsubmit="submitDamageReport(event)"
+                    class="space-y-5"
+                >
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Damage Type
+                        </label>
+
+
+                        <select
+                            class="resq-input"
+                            required
+                        >
+
+                            <option value="">
+                                Select damage type
+                            </option>
+
+                            <option>
+                                Building
+                            </option>
+
+                            <option>
+                                Road
+                            </option>
+
+                            <option>
+                                Bridge
+                            </option>
+
+                            <option>
+                                Electricity
+                            </option>
+
+                            <option>
+                                Water Supply
+                            </option>
+
+                            <option>
+                                Other
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Location
+                        </label>
+
+
+                        <input
+                            class="resq-input"
+                            placeholder="Enter location"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            class="
+                                block
+                                text-sm
+                                font-semibold
+                                mb-2
+                            "
+                        >
+                            Description
+                        </label>
+
+
+                        <textarea
+                            class="resq-input"
+                            rows="5"
+                            placeholder="Describe the damage..."
+                            required
+                        ></textarea>
+
+                    </div>
+
+
+                    <button
+                        type="submit"
+                        class="
+                            w-full
+                            bg-ink
+                            text-white
+                            py-3
+                            rounded-xl
+                            font-bold
+                        "
+                    >
+
+                        Submit Damage Report
+
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function submitDamageReport(event) {
+
+    event.preventDefault();
+
+    showToast(
+        "Damage report submitted"
+    );
+
+}
+
+
+/* =========================================================
+   MISSING PERSON
+========================================================= */
+
+function missingPage() {
+
+    return `
+
+        ${pageHeader(
+            "Missing Persons",
+            "Report or search for missing persons."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                lg:grid-cols-2
+                gap-6
+            "
+        >
+
+
+            <div class="card p-6">
+
+                <h2
+                    class="
+                        text-xl
+                        font-bold
+                        mb-5
+                    "
+                >
+                    Report Missing Person
+                </h2>
+
+
+                <form
+                    onsubmit="submitMissingReport(event)"
+                    class="space-y-4"
+                >
+
+                    <input
+                        class="resq-input"
+                        placeholder="Person's name"
+                        required
+                    >
+
+
+                    <input
+                        class="resq-input"
+                        placeholder="Age"
+                        type="number"
+                    >
+
+
+                    <input
+                        class="resq-input"
+                        placeholder="Last known location"
+                        required
+                    >
+
+
+                    <textarea
+                        class="resq-input"
+                        rows="4"
+                        placeholder="Additional details"
+                    ></textarea>
+
+
+                    <button
+                        type="submit"
+                        class="
+                            w-full
+                            bg-ink
+                            text-white
+                            py-3
+                            rounded-xl
+                            font-bold
+                        "
+                    >
+
+                        Submit Missing Person Report
+
+                    </button>
+
+                </form>
+
+            </div>
+
+
+            <div class="card p-6">
+
+                <h2
+                    class="
+                        text-xl
+                        font-bold
+                        mb-5
+                    "
+                >
+                    Recent Reports
+                </h2>
+
+
+                ${missingPersonCard(
+                    "Aarav Sharma",
+                    "Sector 18",
+                    "12 years"
+                )}
+
+
+                ${missingPersonCard(
+                    "Meera Singh",
+                    "Near City Hospital",
+                    "28 years"
+                )}
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function submitMissingReport(event) {
+
+    event.preventDefault();
+
+    showToast(
+        "Missing person report submitted"
+    );
+
+}
+
+
+/* =========================================================
+   HELP
+========================================================= */
+
+function helpPage() {
+
+    return `
+
+        ${pageHeader(
+            "Help & Support",
+            "Get assistance using ResQNet."
+        )}
+
+
+        <div
+            class="
+                grid
+                grid-cols-1
+                md:grid-cols-2
+                gap-5
+            "
+        >
+
+            ${helpCard(
+                "How ResQNet Works",
+                "Learn how to use the disaster management platform.",
+                "book-open"
+            )}
+
+
+            ${helpCard(
+                "Emergency Assistance",
+                "Use SOS and emergency contacts when immediate help is required.",
+                "siren"
+            )}
+
+
+            ${helpCard(
+                "Shelter Information",
+                "Find available shelters and accommodation capacity.",
+                "home"
+            )}
+
+
+            ${helpCard(
+                "Report an Issue",
+                "Submit damage or missing person reports.",
+                "file-warning"
+            )}
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   HELPER COMPONENTS
+========================================================= */
+
+function pageHeader(
+    title,
+    subtitle
+) {
+
+    return `
+
+        <div
+            class="
+                mb-7
+            "
+        >
+
+            <h1
+                class="
+                    text-2xl
+                    md:text-3xl
+                    font-bold
+                    text-ink
+                "
+            >
+                ${title}
+            </h1>
+
+
+            <p
+                class="
+                    text-sm
+                    md:text-base
+                    text-gray-500
+                    mt-1
+                "
+            >
+                ${subtitle}
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+function statCard(
+    title,
+    value,
+    subtitle,
+    icon
+) {
+
+    return `
+
+        <div
+            class="
+                card
+                p-5
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    items-start
+                    justify-between
+                "
+            >
+
+                <div>
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                        "
+                    >
+                        ${title}
+                    </p>
+
+
+                    <p
+                        class="
+                            text-3xl
+                            font-bold
+                            text-ink
+                            mt-2
+                        "
+                    >
+                        ${value}
+                    </p>
+
+
+                    <p
+                        class="
+                            text-xs
+                            text-gray-400
+                            mt-1
+                        "
+                    >
+                        ${subtitle}
+                    </p>
+
+                </div>
+
+
+                <div
+                    class="
+                        w-11
+                        h-11
+                        rounded-xl
+                        bg-paper
+                        text-ink
+                        flex
+                        items-center
+                        justify-center
+                    "
+                >
+
+                    <i
+                        data-lucide="${icon}"
+                    ></i>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function quickAction(
+    title,
+    icon,
+    action
+) {
+
+    return `
+
+        <button
+            onclick="${action}"
+            class="
+                card
+                p-5
+                text-left
+                hover:-translate-y-1
+                transition
+            "
+        >
+
+            <div
+                class="
+                    w-11
+                    h-11
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                "
+            >
+
+                <i
+                    data-lucide="${icon}"
+                ></i>
+
+            </div>
+
+
+            <p
+                class="
+                    font-bold
+                    text-sm
+                "
+            >
+                ${title}
+            </p>
+
+        </button>
+
+    `;
+
+}
+
+
+function resourceRow(
+    icon,
+    name,
+    status
+) {
+
+    let statusClass =
+        "bg-green-100 text-green-700";
+
+
+    if (
+        status === "Limited"
+    ) {
+
+        statusClass =
+            "bg-amber-100 text-amber-700";
+
+    }
+
+
+    return `
+
+        <div
+            class="
+                flex
+                items-center
+                justify-between
+                p-4
+                rounded-xl
+                bg-paper
+                mb-3
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    items-center
+                    gap-3
+                "
+            >
+
+                <i
+                    data-lucide="${icon}"
+                    class="
+                        w-5
+                        h-5
+                        text-ink
+                    "
+                ></i>
+
+
+                <span class="font-semibold">
+                    ${name}
+                </span>
+
+            </div>
+
+
+            <span
+                class="
+                    ${statusClass}
+                    px-3
+                    py-1
+                    rounded-full
+                    text-xs
+                    font-bold
+                "
+            >
+                ${status}
+            </span>
+
+        </div>
+
+    `;
+
+}
+
+
+function contactRow(
+    title,
+    number,
+    icon
+) {
+
+    return `
+
+        <div
+            class="
+                flex
+                items-center
+                justify-between
+                p-3
+                rounded-xl
+                bg-paper
+                mb-2
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    items-center
+                    gap-3
+                "
+            >
+
+                <i
+                    data-lucide="${icon}"
+                    class="w-5 h-5"
+                ></i>
+
+
+                <span class="font-semibold">
+                    ${title}
+                </span>
+
+            </div>
+
+
+            <a
+                href="tel:${number}"
+                class="
+                    font-bold
+                    text-ink
+                "
+            >
+                ${number}
+            </a>
+
+        </div>
+
+    `;
+
+}
+
+
+function contactCard(
+    title,
+    number,
+    description,
+    icon
+) {
+
+    return `
+
+        <div class="card p-6">
+
+            <div
+                class="
+                    flex
+                    items-center
+                    gap-4
+                "
+            >
+
+                <div
+                    class="
+                        w-12
+                        h-12
+                        rounded-xl
+                        bg-paper
+                        text-ink
+                        flex
+                        items-center
+                        justify-center
+                    "
+                >
+
+                    <i
+                        data-lucide="${icon}"
+                    ></i>
+
+                </div>
+
+
+                <div class="flex-1">
+
+                    <h3 class="font-bold">
+                        ${title}
+                    </h3>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                        "
+                    >
+                        ${description}
+                    </p>
+
+                </div>
+
+
+                <a
+                    href="tel:${number}"
+                    class="
+                        bg-ink
+                        text-white
+                        px-4
+                        py-2
+                        rounded-lg
+                        font-bold
+                    "
+                >
+                    ${number}
+                </a>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function guideCard(
+    title,
+    icon,
+    description
+) {
+
+    return `
+
+        <div
+            class="
+                card
+                p-6
+                resource-card
+            "
+        >
+
+            <div
+                class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                "
+            >
+
+                <i
+                    data-lucide="${icon}"
+                ></i>
+
+            </div>
+
+
+            <h3
+                class="
+                    text-lg
+                    font-bold
+                "
+            >
+                ${title}
+            </h3>
+
+
+            <p
+                class="
+                    text-sm
+                    text-gray-500
+                    mt-2
+                "
+            >
+                ${description}
+            </p>
+
+
+            <button
+                onclick="
+                    showToast(
+                        'Guide opened'
+                    )
+                "
+                class="
+                    mt-4
+                    text-sm
+                    font-bold
+                    text-ink
+                "
+            >
+                Read Guide →
+            </button>
+
+        </div>
+
+    `;
+
+}
+
+
+function shelterCard(
+    name,
+    distance,
+    capacity,
+    occupied
+) {
+
+    const available =
+        capacity - occupied;
+
+
+    return `
+
+        <div
+            class="
+                card
+                p-6
+                resource-card
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    gap-3
+                "
+            >
+
+                <div>
+
+                    <h3
+                        class="
+                            text-lg
+                            font-bold
+                        "
+                    >
+                        ${name}
+                    </h3>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                            mt-1
+                        "
+                    >
+                        ${distance} away
+                    </p>
+
+                </div>
+
+
+                <i
+                    data-lucide="home"
+                    class="text-ink"
+                ></i>
+
+            </div>
+
+
+            <div
+                class="
+                    mt-5
+                    p-4
+                    rounded-xl
+                    bg-paper
+                "
+            >
+
+                <div
+                    class="
+                        flex
+                        justify-between
+                        text-sm
+                    "
+                >
+
+                    <span>
+                        Capacity
+                    </span>
+
+                    <span class="font-bold">
+                        ${capacity}
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="
+                        flex
+                        justify-between
+                        text-sm
+                        mt-2
+                    "
+                >
+
+                    <span>
+                        Occupied
+                    </span>
+
+                    <span class="font-bold">
+                        ${occupied}
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="
+                        flex
+                        justify-between
+                        text-sm
+                        mt-2
+                    "
+                >
+
+                    <span>
+                        Available
+                    </span>
+
+                    <span
+                        class="
+                            font-bold
+                            text-green-700
+                        "
+                    >
+                        ${available}
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <button
+                onclick="
+                    showToast(
+                        'Shelter details opened'
+                    )
+                "
+                class="
+                    w-full
+                    mt-4
+                    bg-ink
+                    text-white
+                    py-3
+                    rounded-xl
+                    font-bold
+                "
+            >
+                View Shelter
+
+            </button>
+
+        </div>
+
+    `;
+
+}
+
+
+function hospitalCard(
+    name,
+    distance,
+    service,
+    status
+) {
+
+    return `
+
+        <div
+            class="
+                card
+                p-6
+                resource-card
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    items-start
+                    justify-between
+                "
+            >
+
+                <div>
+
+                    <h3
+                        class="
+                            text-lg
+                            font-bold
+                        "
+                    >
+                        ${name}
+                    </h3>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                            mt-1
+                        "
+                    >
+                        ${distance} away
+                    </p>
+
+                </div>
+
+
+                <i
+                    data-lucide="hospital"
+                    class="text-ink"
+                ></i>
+
+            </div>
+
+
+            <div
+                class="
+                    mt-4
+                    flex
+                    justify-between
+                    items-center
+                "
+            >
+
+                <span
+                    class="
+                        text-sm
+                        font-semibold
+                    "
+                >
+                    ${service}
+                </span>
+
+
+                <span
+                    class="
+                        bg-green-100
+                        text-green-700
+                        px-3
+                        py-1
+                        rounded-full
+                        text-xs
+                        font-bold
+                    "
+                >
+                    ${status}
+                </span>
+
+            </div>
+
+
+            <button
+                onclick="
+                    showToast(
+                        'Hospital details opened'
+                    )
+                "
+                class="
+                    w-full
+                    mt-4
+                    border
+                    border-ink
+                    text-ink
+                    py-2.5
+                    rounded-xl
+                    font-bold
+                "
+            >
+                View Hospital
+
+            </button>
+
+        </div>
+
+    `;
+
+}
+
+
+function missingPersonCard(
+    name,
+    location,
+    age
+) {
+
+    return `
+
+        <div
+            class="
+                p-4
+                rounded-xl
+                bg-paper
+                mb-3
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    items-center
+                    gap-3
+                "
+            >
+
+                <div
+                    class="
+                        w-10
+                        h-10
+                        rounded-full
+                        bg-white
+                        flex
+                        items-center
+                        justify-center
+                    "
+                >
+
+                    <i
+                        data-lucide="user"
+                    ></i>
+
+                </div>
+
+
+                <div>
+
+                    <p class="font-bold">
+                        ${name}
+                    </p>
+
+
+                    <p
+                        class="
+                            text-xs
+                            text-gray-500
+                        "
+                    >
+                        ${age} • ${location}
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function helpCard(
+    title,
+    description,
+    icon
+) {
+
+    return `
+
+        <button
+            onclick="
+                showToast(
+                    'Help article opened'
+                )
+            "
+            class="
+                card
+                p-6
+                text-left
+                resource-card
+            "
+        >
+
+            <div
+                class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                "
+            >
+
+                <i
+                    data-lucide="${icon}"
+                ></i>
+
+            </div>
+
+
+            <h3
+                class="
+                    text-lg
+                    font-bold
+                "
+            >
+                ${title}
+            </h3>
+
+
+            <p
+                class="
+                    text-sm
+                    text-gray-500
+                    mt-2
+                "
+            >
+                ${description}
+            </p>
+
+        </button>
+
+    `;
+
+}
+
+
+function mapLegend(
+    icon,
+    text
+) {
+
+    return `
+
+        <div
+            class="
+                card
+                p-4
+                flex
+                items-center
+                gap-3
+            "
+        >
+
+            <i
+                data-lucide="${icon}"
+                class="
+                    w-5
+                    h-5
+                    text-ink
+                "
+            ></i>
+
+
+            <span
+                class="
+                    text-sm
+                    font-semibold
+                "
+            >
+                ${text}
+            </span>
+
+        </div>
+
+    `;
+
+}
+
+
+function reportItem(
+    type,
+    description,
+    priority
+) {
+
+    return `
+
+        <div
+            class="
+                p-4
+                rounded-xl
+                bg-paper
+                mb-3
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    items-center
+                    gap-3
+                "
+            >
+
+                <div
+                    class="
+                        w-10
+                        h-10
+                        rounded-xl
+                        bg-white
+                        flex
+                        items-center
+                        justify-center
+                    "
+                >
+
+                    <i
+                        data-lucide="file-warning"
+                        class="w-5 h-5"
+                    ></i>
+
+                </div>
+
+
+                <div class="flex-1">
+
+                    <p class="font-bold text-sm">
+                        ${type}
+                    </p>
+
+
+                    <p
+                        class="
+                            text-xs
+                            text-gray-500
+                        "
+                    >
+                        ${description}
+                    </p>
+
+                </div>
+
+
+                <span
+                    class="
+                        text-xs
+                        font-bold
+                    "
+                >
+                    ${priority}
+                </span>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function largeReportCard(
+    type,
+    description,
+    priority,
+    icon
+) {
+
+    return `
+
+        <div class="card p-6">
+
+            <div
+                class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    flex
+                    items-center
+                    justify-center
+                    text-ink
+                    mb-4
+                "
+            >
+
+                <i
+                    data-lucide="${icon}"
+                ></i>
+
+            </div>
+
+
+            <span
+                class="
+                    text-xs
+                    font-bold
+                    uppercase
+                "
+            >
+                ${priority}
+            </span>
+
+
+            <h3
+                class="
+                    text-lg
+                    font-bold
+                    mt-2
+                "
+            >
+                ${type}
+            </h3>
+
+
+            <p
+                class="
+                    text-sm
+                    text-gray-500
+                    mt-2
+                "
+            >
+                ${description}
+            </p>
+
+
+            <div
+                class="
+                    flex
+                    gap-3
+                    mt-5
+                "
+            >
+
+                <button
+                    onclick="
+                        showToast(
+                            'Report opened'
+                        )
+                    "
+                    class="
+                        flex-1
+                        bg-ink
+                        text-white
+                        py-2.5
+                        rounded-xl
+                        font-bold
+                    "
+                >
+                    View
+                </button>
+
+
+                <button
+                    onclick="
+                        showToast(
+                            'Report assigned'
+                        )
+                    "
+                    class="
+                        flex-1
+                        border
+                        py-2.5
+                        rounded-xl
+                        font-bold
+                    "
+                >
+                    Assign
+                </button>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   USER / UI HELPERS
+========================================================= */
+
+function getRoleName() {
+
+    if (
+        currentUserRole === "citizen"
+    ) {
+
+        return "Citizen";
+
+    }
+
+
+    if (
+        currentUserRole === "shelter"
+    ) {
+
+        return "Shelter Representative";
+
+    }
+
+
+    if (
+        currentUserRole === "government"
+    ) {
+
+        return "Government Authority";
+
+    }
+
+
+    return "User";
+
+}
+
+
+function getInitials(name) {
+
+    if (!name) return "RQ";
+
+
+    const words =
+        name
+            .trim()
+            .split(/\s+/)
+            .slice(0, 2);
+
+
+    return words
+        .map(
+            word =>
+                word
+                    .charAt(0)
+                    .toUpperCase()
+        )
+        .join("");
+
+}
+
+
+function getGreeting() {
+
+    const hour =
+        new Date().getHours();
+
+
+    if (hour < 12) {
+
+        return "Good morning";
+
+    }
+
+
+    if (hour < 18) {
+
+        return "Good afternoon";
+
+    }
+
+
+    return "Good evening";
+
+}
+
+
+function escapeHTML(value) {
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
+
+
+/* =========================================================
+   MOBILE MENU
+========================================================= */
+
+function toggleMobileMenu() {
+
+    const sidebar =
+        document.getElementById(
+            "sidebar"
+        );
+
+    const overlay =
+        document.getElementById(
+            "mobileOverlay"
+        );
+
+
+    if (!sidebar || !overlay) {
+
+        return;
+
+    }
+
+
+    sidebar.classList.toggle(
+        "-translate-x-full"
+    );
+
+    overlay.classList.toggle(
+        "hidden"
+    );
+
+}
+
+
+function closeMobileMenu() {
+
+    const sidebar =
+        document.getElementById(
+            "sidebar"
+        );
+
+    const overlay =
+        document.getElementById(
+            "mobileOverlay"
+        );
+
+
+    if (!sidebar || !overlay) {
+
+        return;
+
+    }
+
+
+    sidebar.classList.add(
+        "-translate-x-full"
+    );
+
+    overlay.classList.add(
+        "hidden"
+    );
+
+}
+
+
+/* =========================================================
+   LOGOUT
+========================================================= */
+
+function logout() {
+
+    currentUserRole = "citizen";
+
+    currentUserName = "ResQNet User";
+
+    currentPage = "login";
+
+
+    showToast(
+        "Logged out successfully"
+    );
+
+
+    setTimeout(
+        function () {
+
+            render();
+
+        },
+        400
+    );
+
+}
+
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+function showToast(message) {
+
+    const toast =
+        document.getElementById(
+            "toast"
+        );
+
+
+    if (!toast) {
+
+        return;
+
+    }
+
+
+    toast.textContent = message;
+
+
+    toast.classList.remove(
+        "hidden"
+    );
+
+
+    clearTimeout(
+        window.resqToastTimer
+    );
+
+
+    window.resqToastTimer =
+        setTimeout(
+            function () {
+
+                toast.classList.add(
+                    "hidden"
+                );
+
+            },
+            2500
+        );
+
+}
