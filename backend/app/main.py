@@ -9,6 +9,7 @@ from app.emergency.hospitals import router as hospital_router
 from app.recovery.alerts import router as alerts_router
 from app.preparedness.guides import router as guides_router
 from app.preparedness.checklist import router as checklist_router
+from app.emergency.sos import router as sos_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -34,6 +35,7 @@ app.include_router(hospital_router)
 app.include_router(alerts_router)
 app.include_router(guides_router)
 app.include_router(checklist_router)
+app.include_router(sos_router)
 
 @app.get("/")
 def home():

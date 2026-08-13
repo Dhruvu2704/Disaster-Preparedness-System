@@ -10,7 +10,6 @@ router = APIRouter(prefix="/api/preparedness", tags=["Preparedness"])
 def get_checklist(disaster_type: str, db: Session = Depends(get_db)):
     return (
         db.query(PreparednessChecklist)
-        .filter(PreparednessChecklist.disaster_type == disaster_type)
-        .order_by(PreparednessChecklist.priority.asc())
+        .order_by(PreparednessChecklist.id.asc())
         .all()
     )
