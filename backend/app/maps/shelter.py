@@ -7,5 +7,10 @@ from app.models.shelter import Shelter
 router = APIRouter(prefix="/api/maps/shelters", tags=["Shelters"])
 
 @router.get("/")
-def get_shelters(db: Session = Depends(get_db)):
-    return db.query(Shelter).all()
+def get_shelters(
+    status: str = "Active",
+    db: Session = Depends(get_db)
+):
+    return db.query(Shelter).filter(
+        Shelter.status == status
+    ).all()

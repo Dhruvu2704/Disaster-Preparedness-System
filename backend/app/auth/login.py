@@ -5,7 +5,7 @@ from passlib.context import CryptContext
 from app.database.session import get_db
 from app.models.user import User
 from app.schemas.user import UserLogin, TokenResponse
-from app.auth.jwt import create_access_token
+from app.auth.jwt import create_access_token, get_current_user
 
 router = APIRouter()
 
@@ -18,7 +18,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     if not db_user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if not pwd_context.verify(user.password, db_user.password):
+    if not pwd_context.verify(user.password, db_user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token({
@@ -28,4 +28,13 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 
     return {
         "access_token": token
+    }
+    
+@router.get("/api/me")
+def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "phone": current_user.phone
     }

@@ -15,3 +15,5 @@ node_modules/
 
 # Windows
 Thumbs.db
+
+.env
