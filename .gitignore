@@ -17,3 +17,6 @@ node_modules/
 Thumbs.db
 
 .env
+
+# ML original dataset
+ml/data/pend-gdis-1960-2018-disasterlocations.csv
