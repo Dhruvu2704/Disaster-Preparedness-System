@@ -97,10 +97,9 @@
 
 </head>
 
+<body class="bg-paper text-ink antialiased">
 
-<body
-  class="bg-paper text-ink antialiased"
->
+  <div id="connection-status"></div>
 
   <!-- ResQNet application -->
   <div id="app"></div>
@@ -122,8 +121,11 @@
     "
   ></div>
 
+  <!-- JavaScript -->
+  <script src="indexeddb/indexedDB.js"></script>
+  <script src="connectivity.js"></script>
+  <script src="sync.js"></script>
 
-  <!-- Frontend JavaScript -->
   <script src="app.js"></script>
 
 </body>

@@ -167,3 +167,16 @@
   }
 
 }
+#connection-status {
+    padding: 8px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.online {
+    color: green;
+}
+
+.offline {
+    color: red;
+}
