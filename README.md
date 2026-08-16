@@ -1,109 +1,196 @@
 # ResQNet
 
-**Online and Offline Disaster Preparedness & Response System**
+### Online & Offline Disaster Preparedness, Emergency Response & Recovery System
 
-**Smart India Hackathon 2025 | Problem Statement: SIH250008**
+> **When infrastructure fails, the phone should not.**
 
-> **When infrastructure fails, the phone should not fail.**
+ResQNet is a disaster management platform designed to help citizens, shelters, and authorities prepare for, respond to, and recover from emergencies.
 
----
-
-## 📌 Project Overview
-
-ResQNet is an **Online and Offline disaster preparedness, emergency response, and recovery platform** designed for situations where internet connectivity becomes unreliable or completely unavailable.
-
-The system ensures that users can still access:
-
-* Disaster preparedness guides
-* Offline emergency maps
-* Nearby shelters and hospitals
-* Emergency contacts
-* SOS functionality
-* Recovery and relief reporting
-
-The application follows a **Local-First, Sync-Later architecture**, where critical resources are available offline and synchronized with the server once connectivity is restored.
+The system combines a web-based frontend with a FastAPI backend and a database-driven architecture. It follows an **offline-first approach**, allowing important emergency information and selected user actions to remain available when internet connectivity is unstable.
 
 ---
 
 ## 🎯 Problem Statement
 
-During disasters such as floods, earthquakes, cyclones, and fires:
+During disasters such as floods, earthquakes, cyclones, fires, and other emergencies:
 
-* Mobile networks become overloaded
-* Internet services fail
-* Online maps stop working
-* Emergency websites become inaccessible
-* Citizens lose access to survival information
+* Mobile networks can become overloaded or unavailable.
+* Internet-dependent services may stop working.
+* People may lose access to emergency information.
+* Finding shelters and medical facilities can become difficult.
+* Emergency and damage reports may not reach authorities immediately.
 
-Most existing emergency applications depend heavily on cloud connectivity and become ineffective during infrastructure failures.
+ResQNet addresses these challenges by bringing preparedness information, emergency resources, SOS assistance, reporting, and recovery support into one platform.
 
 ---
 
-## 💡 Proposed Solution
+## 💡 Our Solution
 
-ResQNet provides a **Progressive Web Application (PWA)** that supports the complete disaster lifecycle.
+ResQNet supports the major stages of disaster management:
 
 ### 1. Prepare
 
-* Disaster safety guides
+* Disaster-specific safety guides
 * Emergency preparedness checklist
-* Emergency contact management
-* Local resource download
+* Emergency contacts
+* Essential emergency information
 
-### 2. Emergency Action
+### 2. Respond
 
-* Offline maps using Leaflet.js
-* Shelter and hospital finder
-* Offline SOS queue
-* Cached emergency resources
+* SOS emergency assistance
+* Emergency map
+* Shelter and hospital information
+* Location-based emergency support
+* Offline-ready emergency data
 
-### 3. Recovery
+### 3. Recover
 
-* Missing person reporting
 * Damage reporting
-* Relief assistance requests
-* Post-disaster coordination
+* Missing-person reporting
+* Help and relief requests
+* Emergency alerts
+* Authority coordination
+
+---
+
+## ⭐ Key Features
+
+### 👤 Citizen
+
+* User registration and login
+* Citizen dashboard
+* Disaster preparedness guides
+* Emergency checklist
+* Emergency contacts
+* Emergency map
+* Shelter finder
+* Hospital finder
+* SOS emergency request
+* Damage reporting
+* Missing-person reporting
+* Help and support requests
+
+### 🏠 Shelter Representative
+
+* Shelter dashboard
+* Shelter information
+* Emergency map
+* Government assistance requests
+* Emergency contacts
+* Hospital information
+* Help and support
+
+### 🏛️ Government / Authority
+
+* Command center
+* Shelter monitoring
+* Emergency alerts
+* Citizen reports
+* Resource requests
+* Missing-person information
+* Emergency map
+* Hospital and emergency contact information
+
+---
+
+## 📴 Offline & Resilient Operation
+
+A major goal of ResQNet is to remain useful when connectivity becomes unreliable.
+
+The project follows a **Local-First, Sync-Later** approach.
+
+### IndexedDB
+
+The frontend uses IndexedDB to store important information locally, such as:
+
+* Disaster guides
+* Shelters
+* Hospitals
+* Pending SOS requests
+* Pending damage reports
+
+When internet connectivity is unavailable, selected actions can be stored locally. Once the connection is restored, the pending information can be synchronized with the backend.
+
+### Offline Navigation
+
+ResQNet also includes an **offline navigation concept** for emergency situations.
+
+Essential location information such as nearby shelters and hospitals can be made available locally so users can still identify important emergency resources when internet connectivity is unavailable.
+
+The offline navigation system is intentionally lightweight and focused on **critical emergency locations and routes**, rather than providing a complete replacement for commercial navigation applications.
+
+---
+
+## 🗺️ Emergency Map
+
+The Emergency Map provides a visual representation of important disaster-response resources.
+
+It focuses on:
+
+* Shelters
+* Hospitals
+* Medical facilities
+* Emergency resources
+* User location
+* Emergency destinations
+
+The project uses **Leaflet.js** for map visualization.
+
+The system is designed so that important emergency resource information can remain accessible through locally stored data when live connectivity is unavailable.
 
 ---
 
 ## 🏗️ System Architecture
 
 ```text
-                  Government / Cloud Server
-                  FastAPI + PostgreSQL
-                           ▲
-                           │ REST APIs
-                           ▼
-
-              HTML + CSS + JavaScript (PWA)
-
-        ┌──────────────────────────────────┐
-        │         Frontend Layer           │
-        │                                  │
-        │  • UI Screens                    │
-        │  • IndexedDB                     │
-        │  • Service Worker                │
-        │  • Cache API                     │
-        │  • Leaflet Offline Maps          │
-        └──────────────────────────────────┘
+                         ResQNet
+                            │
+             ┌──────────────┴──────────────┐
+             │                             │
+        Frontend                       Backend
+     HTML/CSS/JS                    FastAPI + SQLAlchemy
+             │                             │
+       IndexedDB                    PostgreSQL
+             │                             │
+       Offline Queue  ───────────►  Sync API
+             │                             │
+             └──────────────┬──────────────┘
+                            │
+                     Disaster Response
 ```
 
-### Architecture Principle
-
-#### Online Flow
+### Online Flow
 
 ```text
-Frontend → FastAPI → PostgreSQL → Response
+User
+  ↓
+Frontend
+  ↓
+FastAPI API
+  ↓
+PostgreSQL
+  ↓
+Response
 ```
 
-#### Offline Flow
+### Offline Flow
 
 ```text
-Frontend → IndexedDB → Queue Data
-                     ↓
-              Internet Restored
-                     ↓
-IndexedDB → /api/sync → FastAPI → PostgreSQL
+User
+  ↓
+Frontend
+  ↓
+IndexedDB
+  ↓
+Local Cache / Offline Queue
+  ↓
+Internet Restored
+  ↓
+Sync API
+  ↓
+FastAPI
+  ↓
+PostgreSQL
 ```
 
 ---
@@ -112,186 +199,178 @@ IndexedDB → /api/sync → FastAPI → PostgreSQL
 
 ### Frontend
 
-* **HTML5**
-* **CSS3**
-* **JavaScript (ES6+)**
-* **Leaflet.js**
-* **Service Worker**
-* **IndexedDB**
+* HTML5
+* CSS3
+* JavaScript
+* Leaflet.js
+* IndexedDB
+* Lucide Icons
+* Tailwind CSS utilities
 
 ### Backend
 
-* **FastAPI**
-* **SQLAlchemy**
-* **PostgreSQL**
-* **Uvicorn**
+* Python
+* FastAPI
+* SQLAlchemy
+* Pydantic
+* Uvicorn
+* JWT Authentication
+* Passlib / bcrypt
+
+### Database
+
+* PostgreSQL
+
+### Development Tools
+
+* Git
+* GitHub
+* VS Code
+* Live Server
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-ResQNet/
+Disaster-Preparedness-System/
 │
 ├── frontend/
 │   ├── index.html
-│   ├── shelters.html
-│   ├── emergency.html
-│   ├── css/
-│   │   └── style.css
-│   └── js/
-│       ├── app.js
-│       ├── db.js
-│       ├── shelters.js
-│       └── emergency.js
+│   ├── app.js
+│   ├── style.css
+│   └── indexeddb/
+│       └── indexedDB.js
 │
 ├── backend/
 │   ├── app/
-│   ├── auth/
-│   ├── users/
-│   ├── preparedness/
-│   ├── maps/
-│   ├── emergency/
-│   ├── recovery/
-│   ├── sync/
-│   ├── models/
-│   ├── database/
-│   ├── schemas/
-│   ├── services/
-│   ├── main.py
+│   │   ├── auth/
+│   │   ├── database/
+│   │   ├── emergency/
+│   │   ├── maps/
+│   │   ├── models/
+│   │   ├── preparedness/
+│   │   ├── recovery/
+│   │   ├── schemas/
+│   │   └── sync/
+│   │
 │   └── requirements.txt
 │
-└── database/
-    └── ResQNet_schema.sql
+└── README.md
 ```
 
 ---
 
-## 🗄️ Database Architecture
+## 🔐 Authentication
 
-### Core PostgreSQL Tables
+ResQNet provides secure backend authentication using:
 
-#### User Management
+* User registration
+* Password hashing
+* Login
+* JWT access tokens
+* Authenticated API requests
 
-* `users`
-* `emergency_contacts`
-
-#### Preparedness
-
-* `disaster_guides`
-* `preparedness_checklist`
-
-#### Maps & Location
-
-* `shelters`
-* `hospitals`
-* `police_stations`
-* `fire_stations`
-
-#### Emergency
-
-* `sos_requests`
-
-#### Recovery
-
-* `missing_persons`
-* `damage_reports`
-* `help_requests`
-
-#### Alerts
-
-* `alerts`
-
----
-
-## 📦 IndexedDB Design
-
-IndexedDB is used only for **offline caching and queued synchronization**.
-
-### Cached Data
+Example endpoints:
 
 ```text
-guides
-shelters
-hospitals
+POST /api/register
+POST /api/login
+POST /api/login/oauth2
+GET  /api/me
 ```
-
-### Offline Queues
-
-```text
-sos_queue
-damage_queue
-```
-
-This keeps the browser database lightweight while PostgreSQL remains the permanent source of truth.
 
 ---
 
-## 🔌 API Endpoints
+## 🔌 Important API Endpoints
 
 ### Authentication
 
-| Method | Endpoint        |
-| ------ | --------------- |
-| POST   | `/api/register` |
-| POST   | `/api/login`    |
+```text
+POST /api/register
+POST /api/login
+GET  /api/me
+```
 
 ### Preparedness
 
-| Method | Endpoint             |
-| ------ | -------------------- |
-| GET    | `/api/guides`        |
-| GET    | `/api/guides/{type}` |
-| GET    | `/api/checklist`     |
+```text
+GET /api/preparedness/guides/
+GET /api/preparedness/checklist
+```
 
-### Maps
+### Emergency Resources
 
-| Method | Endpoint            |
-| ------ | ------------------- |
-| GET    | `/api/shelters`     |
-| GET    | `/api/hospitals`    |
-| GET    | `/api/police`       |
-| GET    | `/api/firestations` |
+```text
+GET /api/shelters/
+GET /api/emergency/hospitals/
+GET /api/recovery/alerts/
+```
 
-### Emergency
+### SOS
 
-| Method | Endpoint           |
-| ------ | ------------------ |
-| POST   | `/api/sos`         |
-| GET    | `/api/sos/history` |
+```text
+POST /api/sos/
+```
+
+The SOS service can use the user's location to assist with nearby emergency resources such as hospitals and shelters.
 
 ### Recovery
 
-| Method | Endpoint       |
-| ------ | -------------- |
-| POST   | `/api/missing` |
-| POST   | `/api/damage`  |
-| POST   | `/api/help`    |
+```text
+POST /api/damage
+GET  /api/damage
+
+POST /api/missing
+GET  /api/missing
+```
 
 ### Synchronization
 
-| Method | Endpoint    |
-| ------ | ----------- |
-| POST   | `/api/sync` |
+```text
+POST /api/sync
+```
+
+The synchronization endpoint handles information that was stored locally while the user was offline.
+
+---
+
+## 🗄️ Data Management
+
+The backend manages important disaster-response entities including:
+
+* Users
+* Shelters
+* Hospitals
+* SOS requests
+* Disaster guides
+* Preparedness checklists
+* Alerts
+* Damage reports
+* Missing persons
+* Help requests
+
+The central database acts as the primary source of truth, while IndexedDB provides local storage for offline-capable frontend functionality.
 
 ---
 
 ## ⚙️ Backend Setup
 
-### 1. Clone Repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/Dhruvu2704/Disaster-Preparedness-System.git
+
 cd Disaster-Preparedness-System
 ```
 
-### 2. Create Virtual Environment
+### 2. Create a virtual environment
 
 ```bash
 python -m venv venv
 ```
 
-### 3. Activate Environment
+### 3. Activate the environment
 
 #### Windows
 
@@ -305,31 +384,39 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-### 4. Install Dependencies
+### 4. Install dependencies
 
 ```bash
 pip install -r backend/requirements.txt
 ```
 
-### 5. Create PostgreSQL Database
+### 5. Configure PostgreSQL
 
-```sql
-CREATE DATABASE ResQNet;
+Create a PostgreSQL database and configure the database connection in the backend environment.
+
+Example:
+
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/ResQNet
 ```
 
-### 6. Run Schema
+> **Important:** Never commit `.env` files, passwords, API keys, or database credentials to GitHub.
+
+### 6. Start the backend
+
+From the project directory:
 
 ```bash
-psql -U postgres -d ResQNet -f database/ResQNet_schema.sql
+uvicorn app.main:app --reload --app-dir backend
 ```
 
-### 7. Start FastAPI Server
+The backend will run at:
 
-```bash
-uvicorn backend.main:app --reload
+```text
+http://127.0.0.1:8000
 ```
 
-API documentation will be available at:
+Interactive API documentation:
 
 ```text
 http://127.0.0.1:8000/docs
@@ -339,151 +426,154 @@ http://127.0.0.1:8000/docs
 
 ## 🌐 Frontend Setup
 
-Since the frontend is a PWA, it can be served using any static server.
+The frontend can be run using VS Code Live Server or another static web server.
 
-### Option 1: VS Code Live Server
+### Using VS Code Live Server
 
-Open the `frontend` folder and run **Live Server**.
+1. Open the `frontend` folder in VS Code.
+2. Open `index.html`.
+3. Start **Live Server**.
+4. Open the generated local URL.
 
-### Option 2: Python HTTP Server
-
-```bash
-cd frontend
-python -m http.server 5500
-```
-
-Open:
-
-```text
-http://localhost:5500
-```
+Make sure the backend is running before testing features that require API communication.
 
 ---
 
 ## 🔄 Offline Workflow
 
-### First Launch (Online)
-
-1. User opens the application
-2. Frontend downloads:
-
-   * shelters
-   * hospitals
-   * disaster guides
-   * alerts
-3. Data is stored in **IndexedDB**
-4. Service Worker caches static assets
-
-### During Network Failure
-
-* Maps load from cache
-* Shelters load from IndexedDB
-* Guides remain accessible
-* SOS requests are stored locally in `sos_queue`
-
-### When Internet Returns
-
-The Sync Service automatically:
-
-1. Reads pending records from IndexedDB
-2. Sends them to `/api/sync`
-3. Stores them in PostgreSQL
-4. Marks local records as synchronized
-
----
-
-## 📱 Key Features
-
-### Offline Features
-
-* ✅ Offline disaster guides
-* ✅ Offline shelter finder
-* ✅ Offline hospital finder
-* ✅ Offline emergency contacts
-* ✅ Offline SOS queue
-* ✅ Automatic synchronization
-
-### Online Features
-
-* ✅ User authentication
-* ✅ Centralized shelter database
-* ✅ Real-time alerts
-* ✅ Recovery reporting
-* ✅ Administrative analytics
-
----
-
-## 🚀 Future Scope
-
-The architecture has been designed to support future enhancements such as:
-
-* AI-based disaster guidance
-* Multi-language support
-* Voice-based emergency assistance
-* Crowd-sourced hazard reporting
-* Family safety tracking
-* Bluetooth / Wi-Fi Direct mesh communication
-* Predictive disaster analytics
-* Government emergency dashboards
-
----
-
-## 📊 Expected Impact
-
-### Citizen Benefits
-
-* Reliable emergency assistance without internet
-* Faster access to shelters and hospitals
-* Improved disaster preparedness
-* Simplified recovery reporting
-
-### Government Benefits
-
-* Centralized SOS collection
-* Damage heat-map generation
-* Resource prioritization
-* Data-driven relief planning
-
----
-
-## 📖 Disaster Lifecycle Supported
+The basic offline workflow is:
 
 ```text
-PREPARE
-   ↓
-EMERGENCY ACTION
-   ↓
-RECOVERY
+First Online Visit
+       ↓
+Fetch Emergency Data
+       ↓
+Store Important Data Locally
+       ↓
+Internet Connection Lost
+       ↓
+Use Cached Information
+       ↓
+Queue Important Actions
+       ↓
+Internet Restored
+       ↓
+Synchronize With Backend
 ```
 
-ResQNet is designed to remain useful **before, during, and after a disaster**, making it more than just an SOS application.
+This approach is particularly useful during disasters because temporary network failure should not immediately result in the loss of important emergency information or user submissions.
 
 ---
 
-## 📌 Final Statement
+## 🚨 Disaster Management Lifecycle
 
-> **ResQNet transforms a smartphone into a disaster survival toolkit that continues functioning even when conventional digital infrastructure becomes unavailable.**
+```text
+             PREPARE
+                │
+                ▼
+        EMERGENCY RESPONSE
+                │
+                ▼
+             RECOVERY
+                │
+                ▼
+        COMMUNITY RESILIENCE
+```
 
-This project was developed for **Smart India Hackathon 2025** under **Problem Statement SIH250008** and follows an **Online and Offline, resilient emergency response architecture** using **HTML, CSS, JavaScript, IndexedDB, FastAPI, and PostgreSQL**.
+ResQNet is designed to support users **before, during, and after a disaster**.
+
+---
+
+## 🔮 Future Scope
+
+Future improvements can include:
+
+* More complete offline map support
+* Improved offline route calculation
+* Multi-language support
+* Voice-based emergency assistance
+* AI-assisted disaster guidance
+* Crowd-sourced hazard reporting
+* Family safety tracking
+* Bluetooth / Wi-Fi Direct communication
+* Advanced government dashboards
+* Disaster prediction and analytics
+* Push notifications for emergency alerts
+
+---
+
+## 🎯 Expected Impact
+
+### For Citizens
+
+* Faster access to emergency information
+* Better disaster preparedness
+* Easier access to shelters and hospitals
+* Emergency reporting during connectivity problems
+* Simple access to SOS assistance
+
+### For Authorities
+
+* Centralized emergency information
+* Faster access to citizen reports
+* Shelter and resource monitoring
+* Better coordination during disaster recovery
+* Data-driven disaster-response planning
+
+---
+
+## 📌 Project Status
+
+ResQNet is being developed as an **online and offline-capable disaster preparedness and emergency response platform**.
+
+The project includes:
+
+* Frontend interface
+* FastAPI backend
+* User authentication
+* Emergency resource APIs
+* SOS functionality
+* Recovery reporting
+* IndexedDB local storage
+* Synchronization infrastructure
+* Emergency map
+* Offline-capable emergency information
+
+The offline navigation functionality can be progressively expanded with more advanced offline mapping and routing capabilities.
+
+---
+
+## 👥 Team
+
+### Team Name: Recursive:-
+
+* Dhruvi Srivastava
+* Akshara Kamboj
+* Saanvvii Jhhaa
+* Anjali Mishra
+* Aruni Mishra
+* Bhavya Aggarwal
+
+---
+
+## 🏆 Hackathon
+
+Developed for:
+
+**Smart India Hackathon 2025**
+
+**Problem Statement:** SIH250008
 
 ---
 
 ## 📄 License
 
-This project is developed for **educational and hackathon purposes** under the Smart India Hackathon initiative.
+This project is developed for educational and hackathon purposes.
 
 ---
 
-## 🙏 Acknowledgement
+## ❤️ Our Goal
 
-Developed as part of **Smart India Hackathon 2025** to build a resilient, accessible, and offline-capable disaster preparedness and response platform for citizens and emergency management authorities.
+ResQNet aims to build a more resilient disaster-response ecosystem where people can **prepare before a disaster, get help during an emergency, and recover afterward**, even when normal digital infrastructure is disrupted.
 
-## Team Name
-Recursive:- 
-
-* Dhruvi Srivastava 
-* Akshara Kamboj
-* Saanvvii Jhhaa
-* Anjali Mishra
-* Aruni Mishra
-* Bhavya Aggarwal 
+### **ResQNet: Prepare. Respond. Recover.**
