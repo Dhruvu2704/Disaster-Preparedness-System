@@ -60,6 +60,62 @@ async function getShelters() {
     }
 }
 
+async function getChecklist() {
+    try {
+        const response = await fetch(
+            `${API_BASE}/api/preparedness/checklist?disaster_type=general`
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Checklist API returned ${response.status}`
+            );
+        }
+
+        return await response.json();
+
+    } catch (error) {
+        console.error(
+            "Checklist API error:",
+            error
+        );
+
+        showToast(
+            "Unable to load emergency checklist"
+        );
+
+        return [];
+    }
+}
+
+async function getHospitals() {
+    try {
+        const response = await fetch(
+            `${API_BASE}/api/emergency/hospitals/`
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Hospital API returned ${response.status}`
+            );
+        }
+
+        return await response.json();
+
+    } catch (error) {
+        console.error(
+            "Hospital API error:",
+            error
+        );
+
+        showToast(
+            "Unable to load hospitals"
+        );
+
+        return [];
+    }
+}
+
 
 /* =========================================================
    DEMO DATA
@@ -164,12 +220,20 @@ function render() {
 
     }
     if (currentPage === "shelters") {
-    loadShelters();
+        loadShelters();
+    }
+
+    if (currentPage === "map") {
+        setTimeout(function () {
+            initEmergencyMap();
+        }, 100);
     }
 
     if (currentPage === "missing") {
-    loadMissingPersons();
-}
+        loadMissingPersons();
+    }
+
+   
 
 }
 
@@ -4589,16 +4653,17 @@ function guidesPage() {
 /* =========================================================
    CHECKLIST
 ========================================================= */
-
 function checklistPage() {
 
-    return `
+    setTimeout(function () {
+        loadChecklist();
+    }, 0);
 
+    return `
         ${pageHeader(
             "Emergency Checklist",
             "Keep essential items ready before a disaster."
         )}
-
 
         <div class="card p-6 max-w-3xl">
 
@@ -4612,57 +4677,62 @@ function checklistPage() {
                 Emergency Kit
             </h2>
 
+            <div id="checklistContainer">
 
-            ${checkItem(
-                "Drinking water"
-            )}
+                <p class="text-gray-500">
+                    Loading checklist...
+                </p>
 
-
-            ${checkItem(
-                "First aid kit"
-            )}
-
-
-            ${checkItem(
-                "Torch / flashlight"
-            )}
-
-
-            ${checkItem(
-                "Power bank"
-            )}
-
-
-            ${checkItem(
-                "Important documents"
-            )}
-
-
-            ${checkItem(
-                "Emergency medicines"
-            )}
-
-
-            ${checkItem(
-                "Non-perishable food"
-            )}
-
-
-            ${checkItem(
-                "Battery-powered radio"
-            )}
+            </div>
 
         </div>
-
     `;
+}
 
+async function loadChecklist() {
+
+    const container =
+        document.getElementById(
+            "checklistContainer"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    const checklist =
+        await getChecklist();
+
+    if (!checklist.length) {
+
+        container.innerHTML = `
+            <p class="text-gray-500">
+                No checklist items found.
+            </p>
+        `;
+
+        return;
+    }
+
+    container.innerHTML =
+        checklist
+            .map(function (item) {
+
+                return checkItem(
+                    item.item ||
+                    item.name ||
+                    item.title ||
+                    item.description
+                );
+
+            })
+            .join("");
 }
 
 
 function checkItem(text) {
 
     return `
-
         <label
             class="
                 flex
@@ -4681,20 +4751,17 @@ function checkItem(text) {
                 class="w-5 h-5"
             >
 
-
             <span
                 class="
                     text-sm
                     font-semibold
                 "
             >
-                ${text}
+                ${escapeHTML(text)}
             </span>
 
         </label>
-
     `;
-
 }
 
 
@@ -4766,22 +4833,17 @@ function contactsPage() {
 function mapPage() {
 
     return `
-
         ${pageHeader(
             "Emergency Map",
             "Locate shelters, hospitals and emergency resources."
         )}
 
-
         <div class="card p-4">
-
             <div
                 id="resqMap"
                 class="command-map bg-gray-200"
             ></div>
-
         </div>
-
 
         <div
             class="
@@ -4792,106 +4854,156 @@ function mapPage() {
                 mt-5
             "
         >
-
             ${mapLegend(
                 "home",
                 "Shelters"
             )}
-
 
             ${mapLegend(
                 "hospital",
                 "Hospitals"
             )}
 
-
             ${mapLegend(
                 "droplets",
                 "Water"
             )}
 
-
             ${mapLegend(
                 "heart-pulse",
                 "Medical Camps"
             )}
-
         </div>
+   
+        `;
+}
 
-        <script>
+async function initEmergencyMap() {
 
-            setTimeout(function () {
+    const mapElement =
+        document.getElementById("resqMap");
 
-                if (
-                    typeof L !== "undefined" &&
-                    document.getElementById("resqMap")
-                ) {
+    if (!mapElement) {
+        return;
+    }
 
-                    const map =
-                        L.map("resqMap")
-                        .setView(
-                            [28.6139, 77.2090],
-                            11
-                        );
+    if (typeof L === "undefined") {
+        console.error("Leaflet is not loaded");
+        return;
+    }
 
-                    L.tileLayer(
-                        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                        {
-                            attribution:
-                                "&copy; OpenStreetMap contributors"
-                        }
-                    ).addTo(map);
+    const map =
+        L.map("resqMap")
+            .setView(
+                [28.6139, 77.2090],
+                11
+            );
 
-
-                    const locations = [
-
-                        {
-                            lat: 28.6200,
-                            lng: 77.2100,
-                            title:
-                                "Community Relief Center"
-                        },
-
-                        {
-                            lat: 28.6000,
-                            lng: 77.2300,
-                            title:
-                                "Emergency Hospital"
-                        },
-
-                        {
-                            lat: 28.6400,
-                            lng: 77.1900,
-                            title:
-                                "Medical Camp"
-                        }
-
-                    ];
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            attribution:
+                "&copy; OpenStreetMap contributors"
+        }
+    ).addTo(map);
 
 
-                    locations.forEach(function (location) {
+    // GET REAL DATA
+    const shelters =
+        await getShelters();
 
-                        L.marker([
-                            location.lat,
-                            location.lng
-                        ])
-                        .addTo(map)
-                        .bindPopup(
-                            "<b>" +
-                            location.title +
-                            "</b>"
-                        );
+    const hospitals =
+        await getHospitals();
 
-                    });
 
-                }
+    // SHELTERS
+    shelters.forEach(function (shelter) {
 
-            }, 200);
+        if (
+            shelter.latitude == null ||
+            shelter.longitude == null
+        ) {
+            return;
+        }
 
-        </script>
+        L.marker([
+            shelter.latitude,
+            shelter.longitude
+        ])
+        .addTo(map)
+        .bindPopup(`
+            <b>🏠 ${escapeHTML(shelter.name)}</b>
+            <br>
+            Capacity: ${shelter.capacity}
+            <br>
+            Status: ${escapeHTML(shelter.status)}
+            <br>
+            District: ${escapeHTML(
+                shelter.district || "N/A"
+            )}
+        `);
+    });
 
-    `;
 
+    // HOSPITALS
+    hospitals.forEach(function (hospital) {
+
+        if (
+            hospital.latitude == null ||
+            hospital.longitude == null
+        ) {
+            return;
+        }
+
+        L.marker([
+            hospital.latitude,
+            hospital.longitude
+        ])
+        .addTo(map)
+        .bindPopup(`
+            <b>🏥 ${escapeHTML(hospital.name)}</b>
+            <br>
+            📞 ${escapeHTML(hospital.phone)}
+            <br>
+            🛏️ Beds available:
+            ${hospital.beds_available}
+        `);
+    });
+
+
+    // USER LOCATION
+    if (navigator.geolocation) {
+
+        navigator.geolocation.getCurrentPosition(
+            function (position) {
+
+                const latitude =
+                    position.coords.latitude;
+
+                const longitude =
+                    position.coords.longitude;
+
+                L.marker([
+                    latitude,
+                    longitude
+                ])
+                .addTo(map)
+                .bindPopup(
+                    "<b>📍 Your Current Location</b>"
+                )
+                .openPopup();
+
+            },
+            function (error) {
+
+                console.warn(
+                    "Location unavailable:",
+                    error
+                );
+
+            }
+        );
+    }
 }
 
 
