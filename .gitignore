@@ -20,3 +20,7 @@ Thumbs.db
 
 # ML original dataset
 ml/data/pend-gdis-1960-2018-disasterlocations.csv
+
+#Heatmaps
+*.GeoJSON
+*.geojson
