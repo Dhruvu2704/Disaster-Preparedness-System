@@ -26,6 +26,40 @@ let currentUserRole = "citizen";
 
 let currentUserName = "ResQNet User";
 
+const API_BASE = "http://127.0.0.1:8000";
+
+
+async function getShelters() {
+
+    try {
+
+        const response = await fetch(
+            `${API_BASE}/api/shelters?status=Active`
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Shelter API returned ${response.status}`
+            );
+        }
+
+        return await response.json();
+
+    } catch (error) {
+
+        console.error(
+            "Shelter API error:",
+            error
+        );
+
+        showToast(
+            "Unable to load shelters"
+        );
+
+        return [];
+    }
+}
+
 
 /* =========================================================
    DEMO DATA
@@ -129,6 +163,13 @@ function render() {
         lucide.createIcons();
 
     }
+    if (currentPage === "shelters") {
+    loadShelters();
+    }
+
+    if (currentPage === "missing") {
+    loadMissingPersons();
+}
 
 }
 
@@ -1687,10 +1728,9 @@ function registerPage() {
    LOGIN / REGISTER HANDLERS
 ========================================================= */
 
-function handleLogin(event) {
+async function handleLogin(event) {
 
     event.preventDefault();
-
 
     const email =
         document.getElementById("loginEmail").value.trim();
@@ -1702,67 +1742,104 @@ function handleLogin(event) {
         document.getElementById("loginRole").value;
 
 
-    if (
-        !email ||
-        !password ||
-        !role
-    ) {
+    if (!email || !password || !role) {
 
-        showToast(
-            "Please fill all fields"
-        );
+        showToast("Please fill all fields");
 
         return;
-
     }
 
 
-    currentUserRole = role;
+    try {
+
+        const response = await fetch(
+            "http://127.0.0.1:8000/api/login",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    email: email,
+                    password: password
+                })
+            }
+        );
 
 
-    /*
-       For UI demo purposes,
-       name is generated from email.
-    */
-
-    currentUserName =
-        email
-            .split("@")[0]
-            .replace(/[._-]/g, " ");
+        const data = await response.json();
 
 
-    currentUserName =
-        currentUserName
-            .split(" ")
-            .map(
-                word =>
-                    word.charAt(0).toUpperCase() +
-                    word.slice(1)
-            )
-            .join(" ");
+        if (!response.ok) {
+
+            showToast(
+                data.detail || "Invalid email or password"
+            );
+
+            return;
+        }
 
 
-    showToast(
-        "Login successful"
-    );
+        // Store the JWT returned by the backend
+        localStorage.setItem(
+            "resqnet_token",
+            data.access_token
+        );
 
 
-    setTimeout(
-        function () {
+        // Keep the selected frontend role
+        currentUserRole = role;
+
+
+        // Temporary display name until we fetch the
+        // authenticated user's actual profile
+        currentUserName =
+            email
+                .split("@")[0]
+                .replace(/[._-]/g, " ");
+
+
+        currentUserName =
+            currentUserName
+                .split(" ")
+                .map(
+                    word =>
+                        word.charAt(0).toUpperCase() +
+                        word.slice(1)
+                )
+                .join(" ");
+
+
+        showToast("Login successful");
+
+
+        setTimeout(function () {
 
             navigate("dashboard");
 
-        },
-        400
-    );
+        }, 400);
+
+
+    } catch (error) {
+
+        console.error(
+            "Login error:",
+            error
+        );
+
+        showToast(
+            "Unable to connect to the server"
+        );
+    }
 
 }
 
 
-function handleRegister(event) {
+async function handleRegister(event) {
 
     event.preventDefault();
-
 
     const role =
         document.getElementById("registerRole").value;
@@ -1770,73 +1847,102 @@ function handleRegister(event) {
     const name =
         document.getElementById("registerName").value.trim();
 
+    const email =
+        document.getElementById("registerEmail").value.trim();
+
+    const phone =
+        document.getElementById("registerPhone").value.trim();
+
     const password =
         document.getElementById("registerPassword").value;
 
     const confirmPassword =
-        document.getElementById(
-            "registerConfirmPassword"
-        ).value;
+        document.getElementById("registerConfirmPassword").value;
 
 
-    if (
-        !role ||
-        !name
-    ) {
+    if (!role || !name || !email || !phone || !password) {
 
-        showToast(
-            "Please fill all required fields"
-        );
+        showToast("Please fill all required fields");
 
         return;
-
     }
 
 
-    if (
-        password.length < 6
-    ) {
+    if (password.length < 6) {
 
         showToast(
             "Password must contain at least 6 characters"
         );
 
         return;
-
     }
 
 
-    if (
-        password !== confirmPassword
-    ) {
+    if (password !== confirmPassword) {
 
         showToast(
             "Passwords do not match"
         );
 
         return;
-
     }
 
 
-    currentUserRole = role;
+    try {
 
-    currentUserName = name;
+        const response = await fetch(
+            "http://127.0.0.1:8000/api/register",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    name: name,
+                    email: email,
+                    password: password,
+                    phone: phone
+                })
+            }
+        );
 
 
-    showToast(
-        "Account created successfully"
-    );
+        const data = await response.json();
 
 
-    setTimeout(
-        function () {
+        if (!response.ok) {
 
-            navigate("dashboard");
+            showToast(
+                data.detail || "Registration failed"
+            );
 
-        },
-        500
-    );
+            return;
+        }
+
+
+        showToast(
+            "Account created successfully"
+        );
+
+
+        setTimeout(function () {
+
+            navigate("login");
+
+        }, 700);
+
+
+    } catch (error) {
+
+        console.error("Registration error:", error);
+
+        showToast(
+            "Unable to connect to the server"
+        );
+
+    }
 
 }
 
@@ -4289,69 +4395,194 @@ function requestsPage() {
 
 function guidesPage() {
 
-    return `
+    const container = document.createElement("div");
 
+    container.innerHTML = `
         ${pageHeader(
-            "Disaster Preparedness Guides",
-            "Learn what to do before, during and after a disaster."
+            "Disaster Guides",
+            "Practical safety guidance before, during, and after a disaster."
         )}
 
-
         <div
-            class="
-                grid
-                grid-cols-1
-                md:grid-cols-2
-                xl:grid-cols-3
-                gap-5
-            "
+            id="guidesContainer"
+            class="grid grid-cols-1 md:grid-cols-2 gap-5"
         >
-
-            ${guideCard(
-                "Flood",
-                "droplets",
-                "Learn how to prepare for flooding, stay safe and evacuate."
-            )}
-
-
-            ${guideCard(
-                "Earthquake",
-                "activity",
-                "Learn the Drop, Cover and Hold On safety procedure."
-            )}
-
-
-            ${guideCard(
-                "Cyclone",
-                "wind",
-                "Prepare your home and follow evacuation instructions."
-            )}
-
-
-            ${guideCard(
-                "Fire",
-                "flame",
-                "Learn fire evacuation and emergency response procedures."
-            )}
-
-
-            ${guideCard(
-                "Landslide",
-                "mountain",
-                "Understand landslide warning signs and safe evacuation."
-            )}
-
-
-            ${guideCard(
-                "Heatwave",
-                "sun",
-                "Protect yourself from extreme temperatures."
-            )}
-
+            <div class="card p-6 text-center">
+                Loading disaster guides...
+            </div>
         </div>
-
     `;
 
+
+    setTimeout(async function () {
+
+        const guidesContainer =
+            document.getElementById("guidesContainer");
+
+        if (!guidesContainer) {
+            return;
+        }
+
+
+        try {
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/api/preparedness/guides/"
+            );
+
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to load guides: ${response.status}`
+                );
+            }
+
+
+            const guides = await response.json();
+
+
+            if (guides.length === 0) {
+
+                guidesContainer.innerHTML = `
+                    <div class="card p-6 text-center">
+                        No disaster guides available.
+                    </div>
+                `;
+
+                return;
+            }
+
+
+            guidesContainer.innerHTML =
+                guides.map(function (guide) {
+
+                    return `
+
+                        <div class="card p-6">
+
+                            <div class="mb-5">
+
+                                <p
+                                    class="
+                                        text-sm
+                                        font-semibold
+                                        text-gray-500
+                                        mb-1
+                                    "
+                                >
+                                    ${escapeHTML(guide.disaster_type)}
+                                </p>
+
+                                <h3
+                                    class="
+                                        text-xl
+                                        font-bold
+                                    "
+                                >
+                                    ${escapeHTML(guide.title)}
+                                </h3>
+
+                            </div>
+
+
+                            <div class="space-y-4">
+
+                                <div>
+
+                                    <h4
+                                        class="
+                                            font-bold
+                                            mb-1
+                                        "
+                                    >
+                                        Before
+                                    </h4>
+
+                                    <p class="text-gray-600">
+                                        ${escapeHTML(guide.before_text)}
+                                    </p>
+
+                                </div>
+
+
+                                <div>
+
+                                    <h4
+                                        class="
+                                            font-bold
+                                            mb-1
+                                        "
+                                    >
+                                        During
+                                    </h4>
+
+                                    <p class="text-gray-600">
+                                        ${escapeHTML(guide.during_text)}
+                                    </p>
+
+                                </div>
+
+
+                                <div>
+
+                                    <h4
+                                        class="
+                                            font-bold
+                                            mb-1
+                                        "
+                                    >
+                                        After
+                                    </h4>
+
+                                    <p class="text-gray-600">
+                                        ${escapeHTML(guide.after_text)}
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    `;
+
+                }).join("");
+
+
+        } catch (error) {
+
+            console.error(
+                "Guide loading error:",
+                error
+            );
+
+
+            guidesContainer.innerHTML = `
+                <div class="card p-6 text-center">
+
+                    <h3
+                        class="
+                            text-lg
+                            font-bold
+                            text-red-600
+                        "
+                    >
+                        Unable to load disaster guides
+                    </h3>
+
+                    <p class="text-gray-500 mt-2">
+                        Please make sure the backend server is running.
+                    </p>
+
+                </div>
+            `;
+
+        }
+
+    }, 0);
+
+
+    return container.innerHTML;
 }
 
 
@@ -4679,6 +4910,7 @@ function sheltersPage() {
 
 
         <div
+            id="shelterList"
             class="
                 grid
                 grid-cols-1
@@ -4688,36 +4920,213 @@ function sheltersPage() {
             "
         >
 
-            ${shelterCard(
-                "Community Relief Center",
-                "1.8 km",
-                500,
-                312
-            )}
+            <div class="card p-6">
+
+                <p class="text-gray-500">
+                    Loading shelters...
+                </p>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+async function loadShelters() {
+
+    const container =
+        document.getElementById("shelterList");
 
 
-            ${shelterCard(
-                "Government School Camp",
-                "3.2 km",
-                350,
-                210
-            )}
+    if (!container) {
+        return;
+    }
 
 
-            ${shelterCard(
-                "District Emergency Shelter",
-                "4.7 km",
-                700,
-                420
-            )}
+    const shelters =
+        await getShelters();
 
 
-            ${shelterCard(
-                "City Relief Center",
-                "5.1 km",
-                450,
-                430
-            )}
+    if (!shelters.length) {
+
+        container.innerHTML = `
+
+            <div class="card p-6">
+
+                <p class="text-gray-500">
+                    No active shelters found.
+                </p>
+
+            </div>
+
+        `;
+
+        return;
+    }
+
+
+    container.innerHTML =
+        shelters
+            .map(apiShelterCard)
+            .join("");
+
+
+    if (
+        typeof lucide !== "undefined" &&
+        lucide.createIcons
+    ) {
+
+        lucide.createIcons();
+
+    }
+
+}
+
+function apiShelterCard(shelter) {
+
+    return `
+
+        <div
+            class="
+                card
+                p-6
+                resource-card
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    gap-3
+                "
+            >
+
+                <div>
+
+                    <h3
+                        class="
+                            text-lg
+                            font-bold
+                        "
+                    >
+                        ${escapeHTML(shelter.name)}
+                    </h3>
+
+
+                    <p
+                        class="
+                            text-sm
+                            text-gray-500
+                            mt-1
+                        "
+                    >
+                        ${escapeHTML(shelter.district)}
+                    </p>
+
+                </div>
+
+
+                <i
+                    data-lucide="home"
+                    class="text-ink"
+                ></i>
+
+            </div>
+
+
+            <div
+                class="
+                    mt-5
+                    p-4
+                    rounded-xl
+                    bg-paper
+                "
+            >
+
+                <div
+                    class="
+                        flex
+                        justify-between
+                        text-sm
+                    "
+                >
+
+                    <span>
+                        Capacity
+                    </span>
+
+                    <span class="font-bold">
+                        ${shelter.capacity}
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="
+                        flex
+                        justify-between
+                        text-sm
+                        mt-3
+                    "
+                >
+
+                    <span>
+                        Status
+                    </span>
+
+                    <span
+                        class="
+                            font-bold
+                            text-green-700
+                        "
+                    >
+                        ${escapeHTML(shelter.status)}
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="
+                        mt-3
+                        text-sm
+                        text-gray-500
+                    "
+                >
+
+                    Location:
+                    ${shelter.latitude},
+                    ${shelter.longitude}
+
+                </div>
+
+            </div>
+
+
+            <button
+                onclick="
+                    showToast(
+                        'Shelter details opened'
+                    )
+                "
+                class="
+                    w-full
+                    mt-4
+                    bg-ink
+                    text-white
+                    py-3
+                    rounded-xl
+                    font-bold
+                "
+            >
+
+                View Shelter
+
+            </button>
 
         </div>
 
@@ -4732,58 +5141,252 @@ function sheltersPage() {
 
 function hospitalsPage() {
 
-    return `
+    const container = document.createElement("div");
 
+    container.innerHTML = `
         ${pageHeader(
             "Emergency Hospitals",
             "Find hospitals and medical assistance."
         )}
 
-
         <div
-            class="
-                grid
-                grid-cols-1
-                md:grid-cols-2
-                gap-5
-            "
+            id="hospitalsContainer"
+            class="grid grid-cols-1 md:grid-cols-2 gap-5"
         >
-
-            ${hospitalCard(
-                "District General Hospital",
-                "2.4 km",
-                "Emergency",
-                "24/7"
-            )}
-
-
-            ${hospitalCard(
-                "City Medical Center",
-                "4.1 km",
-                "Emergency",
-                "24/7"
-            )}
-
-
-            ${hospitalCard(
-                "Community Health Center",
-                "5.6 km",
-                "Medical Assistance",
-                "Open"
-            )}
-
-
-            ${hospitalCard(
-                "Red Cross Medical Camp",
-                "3.8 km",
-                "Disaster Relief",
-                "Active"
-            )}
-
+            <div class="card p-6 text-center">
+                Loading hospitals...
+            </div>
         </div>
-
     `;
 
+
+    setTimeout(async function () {
+
+        const hospitalsContainer =
+            document.getElementById(
+                "hospitalsContainer"
+            );
+
+
+        if (!hospitalsContainer) {
+            return;
+        }
+
+
+        try {
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/api/emergency/hospitals/"
+            );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    `Failed to load hospitals: ${response.status}`
+                );
+
+            }
+
+
+            const hospitals =
+                await response.json();
+
+
+            if (hospitals.length === 0) {
+
+                hospitalsContainer.innerHTML = `
+                    <div class="card p-6 text-center">
+                        No hospitals available.
+                    </div>
+                `;
+
+                return;
+            }
+
+
+            hospitalsContainer.innerHTML =
+                hospitals.map(function (hospital) {
+
+                    return `
+
+                        <div class="card p-6">
+
+                            <div
+                                class="
+                                    flex
+                                    items-start
+                                    justify-between
+                                    mb-4
+                                "
+                            >
+
+                                <div>
+
+                                    <h3
+                                        class="
+                                            text-xl
+                                            font-bold
+                                        "
+                                    >
+                                        ${escapeHTML(hospital.name)}
+                                    </h3>
+
+                                    <p
+                                        class="
+                                            text-gray-500
+                                            mt-1
+                                        "
+                                    >
+                                        Emergency Medical Facility
+                                    </p>
+
+                                </div>
+
+
+                                <i
+                                    data-lucide="hospital"
+                                    class="w-7 h-7 text-ink"
+                                ></i>
+
+                            </div>
+
+
+                            <div
+                                class="
+                                    bg-paper
+                                    rounded-xl
+                                    p-4
+                                    space-y-3
+                                "
+                            >
+
+                                <div
+                                    class="
+                                        flex
+                                        justify-between
+                                    "
+                                >
+
+                                    <span>
+                                        Available Beds
+                                    </span>
+
+                                    <strong>
+                                        ${hospital.beds_available}
+                                    </strong>
+
+                                </div>
+
+
+                                <div
+                                    class="
+                                        flex
+                                        justify-between
+                                    "
+                                >
+
+                                    <span>
+                                        Phone
+                                    </span>
+
+                                    <strong>
+                                        ${hospital.phone}
+                                    </strong>
+
+                                </div>
+
+
+                                <div>
+
+                                    <span>
+                                        Location
+                                    </span>
+
+                                    <p
+                                        class="
+                                            text-sm
+                                            text-gray-500
+                                            mt-1
+                                        "
+                                    >
+                                        ${hospital.latitude},
+                                        ${hospital.longitude}
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+
+                            <a
+                                href="tel:${hospital.phone}"
+                                class="
+                                    block
+                                    w-full
+                                    mt-5
+                                    bg-ink
+                                    text-white
+                                    py-3
+                                    rounded-xl
+                                    font-bold
+                                    text-center
+                                "
+                            >
+                                Call Hospital
+                            </a>
+
+                        </div>
+
+                    `;
+
+                }).join("");
+
+
+            if (
+                typeof lucide !== "undefined" &&
+                lucide.createIcons
+            ) {
+
+                lucide.createIcons();
+
+            }
+
+
+        } catch (error) {
+
+            console.error(
+                "Hospital loading error:",
+                error
+            );
+
+
+            hospitalsContainer.innerHTML = `
+                <div class="card p-6 text-center">
+
+                    <h3
+                        class="
+                            text-lg
+                            font-bold
+                            text-red-600
+                        "
+                    >
+                        Unable to load hospitals
+                    </h3>
+
+                    <p class="text-gray-500 mt-2">
+                        Please make sure the backend server is running.
+                    </p>
+
+                </div>
+            `;
+
+        }
+
+    }, 0);
+
+
+    return container.innerHTML;
 }
 
 
@@ -4905,13 +5508,178 @@ function sosPage() {
 
 }
 
+function getUserIdFromToken() {
+    const token = localStorage.getItem("resqnet_token");
 
-function triggerSOS() {
+    if (!token) {
+        return null;
+    }
 
-    showToast(
-        "Emergency SOS request prepared"
-    );
+    try {
+        const payload = JSON.parse(
+            atob(token.split(".")[1])
+        );
 
+        return payload.user_id || payload.sub || payload.id || null;
+
+    } catch (error) {
+        console.error("Unable to decode token:", error);
+        return null;
+    }
+}
+
+
+async function triggerSOS() {
+
+    const token =
+        localStorage.getItem("resqnet_token");
+
+    if (!token) {
+        showToast("Please login first");
+        navigate("login");
+        return;
+    }
+
+    const userId = getUserIdFromToken();
+
+    if (!userId) {
+        showToast("Unable to identify logged-in user");
+        return;
+    }
+
+    try {
+
+        let latitude = 28.628;
+        let longitude = 77.370;
+
+        if (navigator.geolocation) {
+
+            try {
+
+                const position =
+                    await new Promise(
+                        (resolve, reject) => {
+
+                            navigator.geolocation.getCurrentPosition(
+                                resolve,
+                                reject,
+                                {
+                                    enableHighAccuracy: true,
+                                    timeout: 5000
+                                }
+                            );
+
+                        }
+                    );
+
+                latitude =
+                    position.coords.latitude;
+
+                longitude =
+                    position.coords.longitude;
+
+            } catch (locationError) {
+
+                console.log(
+                    "Using default SOS location:",
+                    locationError
+                );
+
+            }
+        }
+
+        const response = await fetch(
+            `${API_BASE}/api/sos/`,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+
+                body: JSON.stringify({
+                    user_id: Number(userId),
+                    latitude: latitude,
+                    longitude: longitude
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast("SOS sent successfully");
+
+            console.log("SOS RESPONSE:", data);
+
+            const hospital = data.nearest_hospital;
+            const shelter = data.nearest_shelter;
+
+            alert(
+                `🚨 SOS RECEIVED\n\n` +
+
+                `📍 Location:\n` +
+                `${data.location.latitude}, ${data.location.longitude}\n\n` +
+
+                `🏥 Nearest Hospital:\n` +
+                `${hospital.name}\n` +
+                `📞 ${hospital.phone}\n` +
+                `🛏️ Beds available: ${hospital.beds_available}\n` +
+                `📏 Distance: ${hospital.distance_km} km\n\n` +
+
+                `🏠 Nearest Shelter:\n` +
+                `${shelter.name}\n` +
+                `👥 Capacity: ${shelter.capacity}\n` +
+                `📊 Status: ${shelter.status}\n` +
+                `📏 Distance: ${shelter.distance_km} km`
+            );
+
+            return;
+        }
+
+    console.log("SOS Response:", data);
+
+    if (!response.ok) {
+        console.log(
+            "SOS validation error:",
+            JSON.stringify(data, null, 2)
+        );
+
+        showToast(
+            data.detail
+                ? JSON.stringify(data.detail)
+                : "SOS request failed"
+        );
+
+        return;
+    }
+
+        if (!response.ok) {
+
+            showToast(
+                data.detail ||
+                "Failed to send SOS"
+            );
+
+            return;
+        }
+
+        showToast(
+            "SOS sent successfully"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "SOS API Error:",
+            error
+        );
+
+        showToast(
+            "Unable to connect to the server"
+        );
+    }
 }
 
 
@@ -4921,38 +5689,46 @@ function triggerSOS() {
 
 function damagePage() {
 
-    return `
+    setTimeout(() => {
+        loadDamageReports();
+    }, 0);
 
+    return `
         ${pageHeader(
             "Damage Report",
             "Report damage caused by a disaster."
         )}
 
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        <div class="max-w-3xl mx-auto">
+            <!-- REPORT DAMAGE -->
 
             <div class="card p-6 md:p-8">
+
+                <h2 class="text-xl font-bold mb-5">
+                    Report Damage
+                </h2>
 
                 <form
                     onsubmit="submitDamageReport(event)"
                     class="space-y-5"
                 >
 
+                    <!-- DAMAGE TYPE -->
+
                     <div>
 
-                        <label
-                            class="
-                                block
-                                text-sm
-                                font-semibold
-                                mb-2
-                            "
-                        >
+                        <label class="
+                            block
+                            text-sm
+                            font-semibold
+                            mb-2
+                        ">
                             Damage Type
                         </label>
 
-
                         <select
+                            id="damageType"
                             class="resq-input"
                             required
                         >
@@ -4961,27 +5737,27 @@ function damagePage() {
                                 Select damage type
                             </option>
 
-                            <option>
+                            <option value="Building">
                                 Building
                             </option>
 
-                            <option>
+                            <option value="Road">
                                 Road
                             </option>
 
-                            <option>
+                            <option value="Bridge">
                                 Bridge
                             </option>
 
-                            <option>
+                            <option value="Electricity">
                                 Electricity
                             </option>
 
-                            <option>
+                            <option value="Water Supply">
                                 Water Supply
                             </option>
 
-                            <option>
+                            <option value="Other">
                                 Other
                             </option>
 
@@ -4990,21 +5766,21 @@ function damagePage() {
                     </div>
 
 
+                    <!-- LOCATION -->
+
                     <div>
 
-                        <label
-                            class="
-                                block
-                                text-sm
-                                font-semibold
-                                mb-2
-                            "
-                        >
+                        <label class="
+                            block
+                            text-sm
+                            font-semibold
+                            mb-2
+                        ">
                             Location
                         </label>
 
-
                         <input
+                            id="damageLocation"
                             class="resq-input"
                             placeholder="Enter location"
                             required
@@ -5013,21 +5789,61 @@ function damagePage() {
                     </div>
 
 
+                    <!-- SEVERITY -->
+
                     <div>
 
-                        <label
-                            class="
-                                block
-                                text-sm
-                                font-semibold
-                                mb-2
-                            "
+                        <label class="
+                            block
+                            text-sm
+                            font-semibold
+                            mb-2
+                        ">
+                            Severity
+                        </label>
+
+                        <select
+                            id="damageSeverity"
+                            class="resq-input"
+                            required
                         >
+
+                            <option value="">
+                                Select severity
+                            </option>
+
+                            <option value="Low">
+                                Low
+                            </option>
+
+                            <option value="Medium">
+                                Medium
+                            </option>
+
+                            <option value="High">
+                                High
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- DESCRIPTION -->
+
+                    <div>
+
+                        <label class="
+                            block
+                            text-sm
+                            font-semibold
+                            mb-2
+                        ">
                             Description
                         </label>
 
-
                         <textarea
+                            id="damageDescription"
                             class="resq-input"
                             rows="5"
                             placeholder="Describe the damage..."
@@ -5048,30 +5864,401 @@ function damagePage() {
                             font-bold
                         "
                     >
-
                         Submit Damage Report
-
                     </button>
 
                 </form>
 
             </div>
 
+
+            <!-- RECENT REPORTS -->
+
+            <div class="card p-6">
+
+                <h2 class="text-xl font-bold mb-5">
+                    Recent Damage Reports
+                </h2>
+
+                <div id="damageReportsList">
+
+                    <p class="text-sm text-gray-500">
+                        Loading damage reports...
+                    </p>
+
+                </div>
+
+            </div>
+
         </div>
-
     `;
-
 }
-
-
-function submitDamageReport(event) {
+async function submitDamageReport(event) {
 
     event.preventDefault();
 
-    showToast(
-        "Damage report submitted"
-    );
 
+    const type =
+        document.getElementById("damageType").value;
+
+    const location =
+        document.getElementById("damageLocation").value.trim();
+
+    const severity =
+        document.getElementById("damageSeverity").value;
+
+    const description =
+        document.getElementById("damageDescription").value.trim();
+
+
+    const token =
+        localStorage.getItem("resqnet_token");
+
+
+    if (!token) {
+
+        showToast("Please login first");
+
+        navigate("login");
+
+        return;
+    }
+
+
+    if (
+        !type ||
+        !location ||
+        !severity ||
+        !description
+    ) {
+
+        showToast(
+            "Please fill all required fields"
+        );
+
+        return;
+    }
+
+
+    try {
+
+        /*
+         * Get user's current coordinates.
+         *
+         * If location permission is denied,
+         * use the default project coordinates.
+         */
+
+        let latitude = 28.628;
+        let longitude = 77.370;
+
+
+        if (navigator.geolocation) {
+
+            try {
+
+                const position =
+                    await new Promise(
+                        (resolve, reject) => {
+
+                            navigator.geolocation.getCurrentPosition(
+                                resolve,
+                                reject,
+                                {
+                                    enableHighAccuracy: true,
+                                    timeout: 5000
+                                }
+                            );
+
+                        }
+                    );
+
+
+                latitude =
+                    position.coords.latitude;
+
+                longitude =
+                    position.coords.longitude;
+
+            } catch (locationError) {
+
+                console.log(
+                    "Using default coordinates:",
+                    locationError
+                );
+
+            }
+
+        }
+
+
+        const response = await fetch(
+            `${API_BASE}/api/damage`,
+            {
+                method: "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "Authorization":
+                        `Bearer ${token}`
+
+                },
+
+                body: JSON.stringify({
+
+                    type: type,
+
+                    description:
+                        `${location}: ${description}`,
+
+                    photo: null,
+
+                    latitude: latitude,
+
+                    longitude: longitude,
+
+                    severity: severity
+
+                })
+
+            }
+        );
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "Damage Report Response:",
+            data
+        );
+
+
+        if (!response.ok) {
+
+            showToast(
+                data.detail ||
+                "Failed to submit damage report"
+            );
+
+            return;
+        }
+
+
+        showToast(
+            "Damage report submitted successfully"
+        );
+
+
+        document.getElementById(
+            "damageType"
+        ).value = "";
+
+        document.getElementById(
+            "damageLocation"
+        ).value = "";
+
+        document.getElementById(
+            "damageSeverity"
+        ).value = "";
+
+        document.getElementById(
+            "damageDescription"
+        ).value = "";
+
+
+        await loadDamageReports();
+
+
+    } catch (error) {
+
+        console.error(
+            "Damage Report API Error:",
+            error
+        );
+
+
+        showToast(
+            "Unable to connect to the server"
+        );
+    }
+}
+
+async function loadDamageReports() {
+
+    const container =
+        document.getElementById(
+            "damageReportsList"
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    const token =
+        localStorage.getItem(
+            "resqnet_token"
+        );
+
+
+    if (!token) {
+
+        container.innerHTML = `
+            <p class="text-sm text-gray-500">
+                Please login to view damage reports.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    try {
+
+        const response = await fetch(
+            `${API_BASE}/api/damage`,
+            {
+                method: "GET",
+
+                headers: {
+                    "Authorization":
+                        `Bearer ${token}`
+                }
+            }
+        );
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "Damage Reports:",
+            data
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                "Failed to load damage reports"
+            );
+
+        }
+
+
+        if (
+            !data ||
+            data.length === 0
+        ) {
+
+            container.innerHTML = `
+                <p class="text-sm text-gray-500">
+                    No damage reports found.
+                </p>
+            `;
+
+            return;
+        }
+
+
+        container.innerHTML =
+            data.map(report => {
+
+                return `
+
+                    <div class="
+                        p-4
+                        bg-paper
+                        rounded-xl
+                        mb-3
+                    ">
+
+                        <div class="
+                            flex
+                            items-start
+                            justify-between
+                            gap-3
+                        ">
+
+                            <div>
+
+                                <h3 class="
+                                    font-bold
+                                    text-ink
+                                ">
+                                    ${escapeHTML(
+                                        report.type
+                                    )}
+                                </h3>
+
+
+                                <p class="
+                                    text-sm
+                                    text-gray-500
+                                    mt-1
+                                ">
+                                    ${escapeHTML(
+                                        report.description
+                                    )}
+                                </p>
+
+
+                                <p class="
+                                    text-sm
+                                    text-gray-500
+                                    mt-2
+                                ">
+                                    Location:
+                                    ${report.latitude},
+                                    ${report.longitude}
+                                </p>
+
+                            </div>
+
+
+                            <span class="
+                                px-3
+                                py-1
+                                rounded-full
+                                text-xs
+                                font-bold
+                            ">
+                                ${escapeHTML(
+                                    report.severity
+                                )}
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                `;
+
+            }).join("");
+
+
+    } catch (error) {
+
+        console.error(
+            "Load Damage Reports Error:",
+            error
+        );
+
+
+        container.innerHTML = `
+            <p class="text-sm text-red-500">
+                Unable to load damage reports.
+            </p>
+        `;
+    }
 }
 
 
@@ -5082,35 +6269,20 @@ function submitDamageReport(event) {
 function missingPage() {
 
     return `
-
         ${pageHeader(
             "Missing Persons",
             "Report or search for missing persons."
         )}
 
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        <div
-            class="
-                grid
-                grid-cols-1
-                lg:grid-cols-2
-                gap-6
-            "
-        >
-
+            <!-- REPORT FORM -->
 
             <div class="card p-6">
 
-                <h2
-                    class="
-                        text-xl
-                        font-bold
-                        mb-5
-                    "
-                >
+                <h2 class="text-xl font-bold mb-5">
                     Report Missing Person
                 </h2>
-
 
                 <form
                     onsubmit="submitMissingReport(event)"
@@ -5118,47 +6290,61 @@ function missingPage() {
                 >
 
                     <input
+                        id="missingName"
                         class="resq-input"
                         placeholder="Person's name"
                         required
                     >
 
-
                     <input
+                        id="missingAge"
                         class="resq-input"
                         placeholder="Age"
                         type="number"
+                        required
                     >
 
+                    <select
+                        id="missingGender"
+                        class="resq-input"
+                        required
+                    >
+                        <option value="">
+                            Select Gender
+                        </option>
+
+                        <option value="Male">
+                            Male
+                        </option>
+
+                        <option value="Female">
+                            Female
+                        </option>
+
+                        <option value="Other">
+                            Other
+                        </option>
+                    </select>
 
                     <input
+                        id="missingLastSeen"
                         class="resq-input"
                         placeholder="Last known location"
                         required
                     >
 
-
                     <textarea
+                        id="missingDetails"
                         class="resq-input"
                         rows="4"
                         placeholder="Additional details"
                     ></textarea>
 
-
                     <button
                         type="submit"
-                        class="
-                            w-full
-                            bg-ink
-                            text-white
-                            py-3
-                            rounded-xl
-                            font-bold
-                        "
+                        class="w-full bg-ink text-white py-3 rounded-xl font-bold"
                     >
-
                         Submit Missing Person Report
-
                     </button>
 
                 </form>
@@ -5166,49 +6352,338 @@ function missingPage() {
             </div>
 
 
+            <!-- RECENT REPORTS -->
+
             <div class="card p-6">
 
-                <h2
-                    class="
-                        text-xl
-                        font-bold
-                        mb-5
-                    "
-                >
+                <h2 class="text-xl font-bold mb-5">
                     Recent Reports
                 </h2>
 
-
-                ${missingPersonCard(
-                    "Aarav Sharma",
-                    "Sector 18",
-                    "12 years"
-                )}
-
-
-                ${missingPersonCard(
-                    "Meera Singh",
-                    "Near City Hospital",
-                    "28 years"
-                )}
+                <div id="missingReportsList">
+                    <p class="text-sm text-gray-500">
+                        Loading missing person reports...
+                    </p>
+                </div>
 
             </div>
 
         </div>
-
     `;
-
 }
 
-
-function submitMissingReport(event) {
+async function submitMissingReport(event) {
 
     event.preventDefault();
 
-    showToast(
-        "Missing person report submitted"
-    );
+    const name =
+        document.getElementById("missingName").value.trim();
 
+    const age =
+        Number(document.getElementById("missingAge").value);
+
+    const gender =
+        document.getElementById("missingGender").value;
+
+    const lastSeen =
+        document.getElementById("missingLastSeen").value.trim();
+
+    const token =
+        localStorage.getItem("resqnet_token");
+
+
+    if (!token) {
+
+        showToast("Please login first");
+
+        navigate("login");
+
+        return;
+    }
+
+
+    if (!name || !age || !gender || !lastSeen) {
+
+        showToast("Please fill all required fields");
+
+        return;
+    }
+
+
+    try {
+
+        const response = await fetch(
+            `${API_BASE}/api/missing`,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+
+                body: JSON.stringify({
+
+                    name: name,
+
+                    age: age,
+
+                    gender: gender,
+
+                    photo: null,
+
+                    last_seen: lastSeen,
+
+                    latitude: 28.628,
+
+                    longitude: 77.370
+
+                })
+            }
+        );
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "Missing Person Response:",
+            data
+        );
+
+
+        if (!response.ok) {
+
+            showToast(
+                data.detail ||
+                "Failed to submit report"
+            );
+
+            return;
+        }
+
+
+        showToast(
+            "Missing person report submitted successfully"
+        );
+
+
+        document.getElementById(
+            "missingName"
+        ).value = "";
+
+        document.getElementById(
+            "missingAge"
+        ).value = "";
+
+        document.getElementById(
+            "missingGender"
+        ).value = "";
+
+        document.getElementById(
+            "missingLastSeen"
+        ).value = "";
+
+        document.getElementById(
+            "missingDetails"
+        ).value = "";
+
+
+        await loadMissingPersons();
+
+
+    } catch (error) {
+
+        console.error(
+            "Missing Person API Error:",
+            error
+        );
+
+        showToast(
+            "Unable to connect to the server"
+        );
+    }
+}
+async function loadMissingPersons() {
+
+    const container =
+        document.getElementById(
+            "missingReportsList"
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    const token =
+        localStorage.getItem(
+            "resqnet_token"
+        );
+
+
+    if (!token) {
+
+        container.innerHTML = `
+            <p class="text-sm text-gray-500">
+                Please login to view missing person reports.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    try {
+
+        console.log(
+            "Loading missing persons..."
+        );
+
+
+        const response = await fetch(
+            `${API_BASE}/api/missing`,
+            {
+                method: "GET",
+
+                headers: {
+                    "Authorization":
+                        `Bearer ${token}`
+                }
+            }
+        );
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "Missing Persons API:",
+            data
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                "Failed to load missing persons"
+            );
+        }
+
+
+        if (
+            !data ||
+            data.length === 0
+        ) {
+
+            container.innerHTML = `
+                <p class="text-sm text-gray-500">
+                    No missing person reports found.
+                </p>
+            `;
+
+            return;
+        }
+
+
+        container.innerHTML =
+            data.map(person => {
+
+                return `
+
+                    <div class="
+                        p-4
+                        bg-paper
+                        rounded-xl
+                        mb-3
+                    ">
+
+                        <div class="
+                            flex
+                            items-start
+                            justify-between
+                            gap-3
+                        ">
+
+                            <div>
+
+                                <h3 class="
+                                    font-bold
+                                    text-ink
+                                ">
+                                    ${escapeHTML(
+                                        person.name
+                                    )}
+                                </h3>
+
+
+                                <p class="
+                                    text-sm
+                                    text-gray-500
+                                    mt-1
+                                ">
+                                    ${person.age} years
+                                    • ${escapeHTML(
+                                        person.gender
+                                    )}
+                                </p>
+
+
+                                <p class="
+                                    text-sm
+                                    text-gray-500
+                                ">
+                                    Last seen:
+                                    ${escapeHTML(
+                                        person.last_seen
+                                    )}
+                                </p>
+
+                            </div>
+
+
+                            <span class="
+                                px-3
+                                py-1
+                                rounded-full
+                                text-xs
+                                font-bold
+                                bg-red-100
+                                text-red-700
+                            ">
+                                ${escapeHTML(
+                                    person.status ||
+                                    "Missing"
+                                )}
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                `;
+
+            }).join("");
+
+
+    } catch (error) {
+
+        console.error(
+            "Load Missing Persons Error:",
+            error
+        );
+
+
+        container.innerHTML = `
+            <p class="text-sm text-red-500">
+                Unable to load missing person reports.
+            </p>
+        `;
+    }
 }
 
 
@@ -5219,53 +6694,187 @@ function submitMissingReport(event) {
 function helpPage() {
 
     return `
-
         ${pageHeader(
             "Help & Support",
             "Get assistance using ResQNet."
         )}
 
+        <div class="
+            grid
+            grid-cols-1
+            md:grid-cols-2
+            gap-5
+        ">
 
-        <div
-            class="
-                grid
-                grid-cols-1
-                md:grid-cols-2
-                gap-5
-            "
-        >
+            <button
+                onclick="navigate('guides')"
+                class="card p-6 text-left resource-card"
+            >
+                <div class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                ">
+                    <i data-lucide="book-open"></i>
+                </div>
 
-            ${helpCard(
-                "How ResQNet Works",
-                "Learn how to use the disaster management platform.",
-                "book-open"
-            )}
+                <h3 class="text-lg font-bold">
+                    How ResQNet Works
+                </h3>
 
-
-            ${helpCard(
-                "Emergency Assistance",
-                "Use SOS and emergency contacts when immediate help is required.",
-                "siren"
-            )}
-
-
-            ${helpCard(
-                "Shelter Information",
-                "Find available shelters and accommodation capacity.",
-                "home"
-            )}
+                <p class="text-sm text-gray-500 mt-2">
+                    Learn how to use disaster guides and preparedness resources.
+                </p>
+            </button>
 
 
-            ${helpCard(
-                "Report an Issue",
-                "Submit damage or missing person reports.",
-                "file-warning"
-            )}
+            <button
+                onclick="navigate('sos')"
+                class="card p-6 text-left resource-card"
+            >
+                <div class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                ">
+                    <i data-lucide="siren"></i>
+                </div>
+
+                <h3 class="text-lg font-bold">
+                    Emergency Assistance
+                </h3>
+
+                <p class="text-sm text-gray-500 mt-2">
+                    Send an SOS or access emergency assistance.
+                </p>
+            </button>
+
+
+            <button
+                onclick="navigate('shelters')"
+                class="card p-6 text-left resource-card"
+            >
+                <div class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                ">
+                    <i data-lucide="home"></i>
+                </div>
+
+                <h3 class="text-lg font-bold">
+                    Shelter Information
+                </h3>
+
+                <p class="text-sm text-gray-500 mt-2">
+                    Find available shelters and their capacity.
+                </p>
+            </button>
+
+
+            <button
+                onclick="navigate('contacts')"
+                class="card p-6 text-left resource-card"
+            >
+                <div class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                ">
+                    <i data-lucide="phone"></i>
+                </div>
+
+                <h3 class="text-lg font-bold">
+                    Emergency Contacts
+                </h3>
+
+                <p class="text-sm text-gray-500 mt-2">
+                    Access important emergency service numbers.
+                </p>
+            </button>
+
+
+            <button
+                onclick="navigate('damage')"
+                class="card p-6 text-left resource-card"
+            >
+                <div class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                ">
+                    <i data-lucide="file-warning"></i>
+                </div>
+
+                <h3 class="text-lg font-bold">
+                    Report Damage
+                </h3>
+
+                <p class="text-sm text-gray-500 mt-2">
+                    Report damaged roads, buildings, bridges and utilities.
+                </p>
+            </button>
+
+
+            <button
+                onclick="navigate('missing')"
+                class="card p-6 text-left resource-card"
+            >
+                <div class="
+                    w-12
+                    h-12
+                    rounded-xl
+                    bg-paper
+                    text-ink
+                    flex
+                    items-center
+                    justify-center
+                    mb-4
+                ">
+                    <i data-lucide="user-search"></i>
+                </div>
+
+                <h3 class="text-lg font-bold">
+                    Missing Persons
+                </h3>
+
+                <p class="text-sm text-gray-500 mt-2">
+                    Report and view missing person reports.
+                </p>
+            </button>
 
         </div>
-
     `;
-
 }
 
 
