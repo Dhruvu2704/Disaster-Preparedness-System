@@ -5699,6 +5699,51 @@ async function triggerSOS() {
 
             }
         }
+                // 📡 OFFLINE CHECK
+                
+        if (
+            !navigator.onLine ||
+            (typeof navigator.onLine === "boolean" && navigator.onLine === false)
+        ) {
+
+            console.log("📴 OFFLINE - Queueing SOS directly");
+
+            await indexedDBService.queueSOS({
+                type: "SOS",
+                message: "Emergency SOS",
+                user_id: Number(userId),
+                latitude: latitude,
+                longitude: longitude,
+                timestamp: new Date().toISOString()
+            });
+
+            console.log("✅ SOS queued successfully");
+
+            showToast(
+                "📴 No internet. SOS saved and will sync when connection returns."
+            );
+
+            return;
+        }
+        console.log("🔥 BEFORE FETCH - ONLINE:", navigator.onLine);
+
+if (!navigator.onLine) {
+    console.log("🔥 OFFLINE BLOCK TRIGGERED");
+
+    await indexedDBService.queueSOS({
+        type: "SOS",
+        message: "Emergency SOS",
+        user_id: Number(userId),
+        latitude: latitude,
+        longitude: longitude,
+        timestamp: new Date().toISOString()
+    });
+
+    console.log("🔥 SOS SAVED TO INDEXEDDB");
+
+    showToast("📴 SOS saved offline");
+    return;
+}
 
         const response = await fetch(
             `${API_BASE}/api/sos/`,
@@ -5728,23 +5773,40 @@ async function triggerSOS() {
             const hospital = data.nearest_hospital;
             const shelter = data.nearest_shelter;
 
+            let hospitalText = "🏥 Nearest Hospital:\n";
+
+            if (hospital) {
+                hospitalText +=
+                    `${hospital.name}\n` +
+                    `📞 ${hospital.phone}\n` +
+                    `🛏️ Beds available: ${hospital.beds_available}\n` +
+                    `📏 Distance: ${hospital.distance_km} km\n`;
+            } else {
+                hospitalText += "No nearby hospital found.\n";
+            }
+
+            let shelterText = "🏠 Nearest Shelter:\n";
+
+            if (shelter) {
+                shelterText +=
+                    `${shelter.name}\n` +
+                    `👥 Capacity: ${shelter.capacity}\n` +
+                    `📊 Status: ${shelter.status}\n` +
+                    `📏 Distance: ${shelter.distance_km} km`;
+            } else {
+                shelterText += "No nearby shelter found.";
+            }
+
             alert(
                 `🚨 SOS RECEIVED\n\n` +
 
                 `📍 Location:\n` +
                 `${data.location.latitude}, ${data.location.longitude}\n\n` +
 
-                `🏥 Nearest Hospital:\n` +
-                `${hospital.name}\n` +
-                `📞 ${hospital.phone}\n` +
-                `🛏️ Beds available: ${hospital.beds_available}\n` +
-                `📏 Distance: ${hospital.distance_km} km\n\n` +
+                hospitalText +
+                `\n` +
 
-                `🏠 Nearest Shelter:\n` +
-                `${shelter.name}\n` +
-                `👥 Capacity: ${shelter.capacity}\n` +
-                `📊 Status: ${shelter.status}\n` +
-                `📏 Distance: ${shelter.distance_km} km`
+                shelterText
             );
 
             return;
@@ -5783,15 +5845,69 @@ async function triggerSOS() {
 
     } catch (error) {
 
+    console.error(
+        "SOS API Error:",
+        error
+    );
+
+    try {
+
+        let offlineLatitude = null;
+        let offlineLongitude = null;
+
+        try {
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                    resolve,
+                    reject,
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 30000
+                    }
+                );
+            });
+
+            offlineLatitude = position.coords.latitude;
+            offlineLongitude = position.coords.longitude;
+
+        } catch (locationError) {
+
+            console.warn(
+                "Could not get GPS location while offline:",
+                locationError
+            );
+        }
+
+        await queueSOS({
+
+            type: "SOS",
+
+            message: "Emergency SOS",
+
+            user_id: Number(userId),
+
+            latitude: offlineLatitude,
+
+            longitude: offlineLongitude
+        });
+
+        showToast(
+            "SOS saved offline. It will sync when connection returns."
+        );
+
+    } catch (queueError) {
+
         console.error(
-            "SOS API Error:",
-            error
+            "Failed to queue SOS:",
+            queueError
         );
 
         showToast(
-            "Unable to connect to the server"
+            "Unable to send or save SOS"
         );
     }
+}
 }
 
 
@@ -6199,7 +6315,80 @@ async function submitDamageReport(event) {
         );
     }
 }
+async function loadOfflineData() {
 
+    if (!navigator.onLine) {
+        console.log("📴 Offline - using cached data");
+        return;
+    }
+
+    try {
+
+        console.log("🌐 Loading disaster data from backend...");
+
+        // Shelters
+        const sheltersResponse =
+            await fetch(`${API_BASE}/api/shelters/`);
+
+        if (sheltersResponse.ok) {
+            const shelters =
+                await sheltersResponse.json();
+
+            console.log("Shelters from API:", shelters);
+
+            await indexedDBService.saveShelters(shelters);
+
+            console.log("✅ Shelters cached");
+        }
+
+
+        // Hospitals
+        const hospitalsResponse =
+            await fetch(
+                `${API_BASE}/api/emergency/hospitals/`
+            );
+
+        if (hospitalsResponse.ok) {
+            const hospitals =
+                await hospitalsResponse.json();
+
+            console.log("Hospitals from API:", hospitals);
+
+            await indexedDBService.saveHospitals(hospitals);
+
+            console.log("✅ Hospitals cached");
+        }
+
+
+        // Guides
+        const guidesResponse =
+            await fetch(
+                `${API_BASE}/api/preparedness/guides/`
+            );
+
+        if (guidesResponse.ok) {
+            const guides =
+                await guidesResponse.json();
+
+            console.log("Guides from API:", guides);
+
+            await indexedDBService.saveGuides(guides);
+
+            console.log("✅ Guides cached");
+        }
+
+
+        console.log("🎉 Disaster data cached successfully");
+
+    } catch (error) {
+
+        console.error(
+            "❌ Failed to load disaster data:",
+            error
+        );
+
+    }
+}
 async function loadDamageReports() {
 
     const container =
@@ -8391,3 +8580,6 @@ function showToast(message) {
         );
 
 }
+window.addEventListener("load", function () {
+    loadOfflineData();
+});

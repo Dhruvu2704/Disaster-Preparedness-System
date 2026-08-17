@@ -2,7 +2,6 @@ const DB_NAME = "DisasterPreparednessDB";
 const DB_VERSION = 2;
 
 const STORES = {
-    // Cached data
     GUIDES: "guides",
     CHECKLIST: "checklist",
     SHELTERS: "shelters",
@@ -10,7 +9,6 @@ const STORES = {
     ALERTS: "alerts",
     EMERGENCY_CONTACTS: "emergency_contacts",
 
-    // Offline queues
     SOS_QUEUE: "sos_queue",
     DAMAGE_QUEUE: "damage_queue",
     MISSING_QUEUE: "missing_queue",
@@ -31,172 +29,92 @@ function openDatabase() {
             DB_VERSION
         );
 
-
-        // Runs when database is created
-        // or database version is increased
         request.onupgradeneeded = function (event) {
 
             const db = event.target.result;
 
-
-            // ========================================
-            // CACHED DATA
-            // ========================================
-
-            // GUIDES
+            // Cached data stores
             if (!db.objectStoreNames.contains(STORES.GUIDES)) {
-
-                db.createObjectStore(
-                    STORES.GUIDES,
-                    {
-                        keyPath: "id"
-                    }
-                );
+                db.createObjectStore(STORES.GUIDES, {
+                    keyPath: "id"
+                });
             }
 
-
-            // CHECKLIST
             if (!db.objectStoreNames.contains(STORES.CHECKLIST)) {
-
-                db.createObjectStore(
-                    STORES.CHECKLIST,
-                    {
-                        keyPath: "id"
-                    }
-                );
+                db.createObjectStore(STORES.CHECKLIST, {
+                    keyPath: "id"
+                });
             }
 
-
-            // SHELTERS
             if (!db.objectStoreNames.contains(STORES.SHELTERS)) {
-
-                db.createObjectStore(
-                    STORES.SHELTERS,
-                    {
-                        keyPath: "id"
-                    }
-                );
+                db.createObjectStore(STORES.SHELTERS, {
+                    keyPath: "id"
+                });
             }
 
-
-            // HOSPITALS
             if (!db.objectStoreNames.contains(STORES.HOSPITALS)) {
-
-                db.createObjectStore(
-                    STORES.HOSPITALS,
-                    {
-                        keyPath: "id"
-                    }
-                );
+                db.createObjectStore(STORES.HOSPITALS, {
+                    keyPath: "id"
+                });
             }
 
-
-            // ALERTS
             if (!db.objectStoreNames.contains(STORES.ALERTS)) {
-
-                db.createObjectStore(
-                    STORES.ALERTS,
-                    {
-                        keyPath: "id"
-                    }
-                );
+                db.createObjectStore(STORES.ALERTS, {
+                    keyPath: "id"
+                });
             }
 
-
-            // EMERGENCY CONTACTS
             if (!db.objectStoreNames.contains(STORES.EMERGENCY_CONTACTS)) {
-
-                db.createObjectStore(
-                    STORES.EMERGENCY_CONTACTS,
-                    {
-                        keyPath: "id"
-                    }
-                );
+                db.createObjectStore(STORES.EMERGENCY_CONTACTS, {
+                    keyPath: "id"
+                });
             }
 
 
-            // ========================================
-            // OFFLINE QUEUES
-            // ========================================
-
-            // SOS QUEUE
+            // Offline queues
             if (!db.objectStoreNames.contains(STORES.SOS_QUEUE)) {
-
-                db.createObjectStore(
-                    STORES.SOS_QUEUE,
-                    {
-                        keyPath: "queueId",
-                        autoIncrement: true
-                    }
-                );
+                db.createObjectStore(STORES.SOS_QUEUE, {
+                    keyPath: "queueId",
+                    autoIncrement: true
+                });
             }
 
-
-            // DAMAGE QUEUE
             if (!db.objectStoreNames.contains(STORES.DAMAGE_QUEUE)) {
-
-                db.createObjectStore(
-                    STORES.DAMAGE_QUEUE,
-                    {
-                        keyPath: "queueId",
-                        autoIncrement: true
-                    }
-                );
+                db.createObjectStore(STORES.DAMAGE_QUEUE, {
+                    keyPath: "queueId",
+                    autoIncrement: true
+                });
             }
 
-
-            // MISSING PERSON QUEUE
             if (!db.objectStoreNames.contains(STORES.MISSING_QUEUE)) {
-
-                db.createObjectStore(
-                    STORES.MISSING_QUEUE,
-                    {
-                        keyPath: "queueId",
-                        autoIncrement: true
-                    }
-                );
+                db.createObjectStore(STORES.MISSING_QUEUE, {
+                    keyPath: "queueId",
+                    autoIncrement: true
+                });
             }
 
-
-            // HELP REQUEST QUEUE
             if (!db.objectStoreNames.contains(STORES.HELP_QUEUE)) {
-
-                db.createObjectStore(
-                    STORES.HELP_QUEUE,
-                    {
-                        keyPath: "queueId",
-                        autoIncrement: true
-                    }
-                );
+                db.createObjectStore(STORES.HELP_QUEUE, {
+                    keyPath: "queueId",
+                    autoIncrement: true
+                });
             }
         };
 
 
-        // ========================================
-        // DATABASE OPENED SUCCESSFULLY
-        // ========================================
-
         request.onsuccess = function () {
-
             resolve(request.result);
         };
 
-
-        // ========================================
-        // DATABASE ERROR
-        // ========================================
-
         request.onerror = function () {
-
             reject(request.error);
         };
     });
 }
 
 
-
 // ========================================
-// SAVE CACHED DATA
+// GENERIC SAVE DATA
 // ========================================
 
 async function saveData(storeName, data) {
@@ -210,38 +128,34 @@ async function saveData(storeName, data) {
             "readwrite"
         );
 
-        const store =
-            transaction.objectStore(storeName);
+        const store = transaction.objectStore(storeName);
 
+        if (Array.isArray(data)) {
 
-        data.forEach(item => {
+            data.forEach(item => {
+                store.put(item);
+            });
 
-            store.put(item);
+        } else {
 
-        });
-
+            store.put(data);
+        }
 
         transaction.oncomplete = () => {
-
             db.close();
-
             resolve();
         };
 
-
         transaction.onerror = () => {
-
             db.close();
-
             reject(transaction.error);
         };
     });
 }
 
 
-
 // ========================================
-// GET CACHED DATA
+// GENERIC GET DATA
 // ========================================
 
 async function getData(storeName) {
@@ -255,163 +169,84 @@ async function getData(storeName) {
             "readonly"
         );
 
-        const store =
-            transaction.objectStore(storeName);
+        const store = transaction.objectStore(storeName);
 
-
-        const request =
-            store.getAll();
-
+        const request = store.getAll();
 
         request.onsuccess = () => {
-
             db.close();
-
             resolve(request.result);
         };
 
-
         request.onerror = () => {
-
             db.close();
-
             reject(request.error);
         };
     });
 }
 
 
-
 // ========================================
-// GUIDES
+// CACHED DATA
 // ========================================
 
-async function saveGuides(guides) {
-
-    return saveData(
-        STORES.GUIDES,
-        guides
-    );
+async function saveGuides(data) {
+    return saveData(STORES.GUIDES, data);
 }
-
 
 async function getGuides() {
-
-    return getData(
-        STORES.GUIDES
-    );
+    return getData(STORES.GUIDES);
 }
 
 
-
-// ========================================
-// CHECKLIST
-// ========================================
-
-async function saveChecklist(checklist) {
-
-    return saveData(
-        STORES.CHECKLIST,
-        checklist
-    );
+async function saveChecklist(data) {
+    return saveData(STORES.CHECKLIST, data);
 }
-
 
 async function getChecklist() {
-
-    return getData(
-        STORES.CHECKLIST
-    );
+    return getData(STORES.CHECKLIST);
 }
 
 
-
-// ========================================
-// SHELTERS
-// ========================================
-
-async function saveShelters(shelters) {
-
-    return saveData(
-        STORES.SHELTERS,
-        shelters
-    );
+async function saveShelters(data) {
+    return saveData(STORES.SHELTERS, data);
 }
-
 
 async function getShelters() {
-
-    return getData(
-        STORES.SHELTERS
-    );
+    return getData(STORES.SHELTERS);
 }
 
 
-
-// ========================================
-// HOSPITALS
-// ========================================
-
-async function saveHospitals(hospitals) {
-
-    return saveData(
-        STORES.HOSPITALS,
-        hospitals
-    );
+async function saveHospitals(data) {
+    return saveData(STORES.HOSPITALS, data);
 }
-
 
 async function getHospitals() {
-
-    return getData(
-        STORES.HOSPITALS
-    );
+    return getData(STORES.HOSPITALS);
 }
 
 
-
-// ========================================
-// ALERTS
-// ========================================
-
-async function saveAlerts(alerts) {
-
-    return saveData(
-        STORES.ALERTS,
-        alerts
-    );
+async function saveAlerts(data) {
+    return saveData(STORES.ALERTS, data);
 }
-
 
 async function getAlerts() {
-
-    return getData(
-        STORES.ALERTS
-    );
+    return getData(STORES.ALERTS);
 }
 
 
-
-// ========================================
-// EMERGENCY CONTACTS
-// ========================================
-
-async function saveEmergencyContacts(contacts) {
-
+async function saveEmergencyContacts(data) {
     return saveData(
         STORES.EMERGENCY_CONTACTS,
-        contacts
+        data
     );
 }
 
-
 async function getEmergencyContacts() {
-
     return getData(
         STORES.EMERGENCY_CONTACTS
     );
 }
-
 
 
 // ========================================
@@ -424,40 +259,62 @@ async function queueSOS(sosData) {
 
     return new Promise((resolve, reject) => {
 
-        const transaction =
-            db.transaction(
-                STORES.SOS_QUEUE,
-                "readwrite"
-            );
+        const transaction = db.transaction(
+            STORES.SOS_QUEUE,
+            "readwrite"
+        );
 
-        const store =
-            transaction.objectStore(
-                STORES.SOS_QUEUE
-            );
+        const store = transaction.objectStore(
+            STORES.SOS_QUEUE
+        );
 
-
-        store.add({
+        const sosRecord = {
 
             ...sosData,
+
+            // Backend-required fields
+            latitude:
+                sosData.latitude !== undefined
+                    ? sosData.latitude
+                    : null,
+
+            longitude:
+                sosData.longitude !== undefined
+                    ? sosData.longitude
+                    : null,
+
+            timestamp:
+                sosData.timestamp ||
+                new Date().toISOString(),
 
             queuedAt:
                 new Date().toISOString(),
 
             status: "pending"
-        });
+        };
 
+        store.add(sosRecord);
 
         transaction.oncomplete = () => {
 
             db.close();
 
-            resolve();
-        };
+            console.log(
+                "SOS queued successfully:",
+                sosRecord
+            );
 
+            resolve(sosRecord);
+        };
 
         transaction.onerror = () => {
 
             db.close();
+
+            console.error(
+                "Failed to queue SOS:",
+                transaction.error
+            );
 
             reject(transaction.error);
         };
@@ -473,32 +330,81 @@ async function getSOSQueue() {
 }
 
 
-
 // ========================================
-// DAMAGE QUEUE
+// UPDATE SOS
 // ========================================
 
-async function queueDamage(damageData) {
+async function updateSOS(sosData) {
+
+    if (
+        !sosData ||
+        sosData.queueId === undefined
+    ) {
+
+        throw new Error(
+            "queueId is required to update SOS"
+        );
+    }
 
     const db = await openDatabase();
 
     return new Promise((resolve, reject) => {
 
-        const transaction =
-            db.transaction(
-                STORES.DAMAGE_QUEUE,
-                "readwrite"
+        const transaction = db.transaction(
+            STORES.SOS_QUEUE,
+            "readwrite"
+        );
+
+        const store = transaction.objectStore(
+            STORES.SOS_QUEUE
+        );
+
+        store.put(sosData);
+
+        transaction.oncomplete = () => {
+
+            db.close();
+
+            console.log(
+                "SOS updated:",
+                sosData
             );
 
-        const store =
-            transaction.objectStore(
-                STORES.DAMAGE_QUEUE
-            );
+            resolve(sosData);
+        };
 
+        transaction.onerror = () => {
+
+            db.close();
+
+            reject(transaction.error);
+        };
+    });
+}
+
+
+// ========================================
+// DAMAGE QUEUE
+// ========================================
+
+async function queueDamage(data) {
+
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+
+        const transaction = db.transaction(
+            STORES.DAMAGE_QUEUE,
+            "readwrite"
+        );
+
+        const store = transaction.objectStore(
+            STORES.DAMAGE_QUEUE
+        );
 
         store.add({
 
-            ...damageData,
+            ...data,
 
             queuedAt:
                 new Date().toISOString(),
@@ -506,14 +412,12 @@ async function queueDamage(damageData) {
             status: "pending"
         });
 
-
         transaction.oncomplete = () => {
 
             db.close();
 
             resolve();
         };
-
 
         transaction.onerror = () => {
 
@@ -533,32 +437,28 @@ async function getDamageQueue() {
 }
 
 
-
 // ========================================
 // MISSING PERSON QUEUE
 // ========================================
 
-async function queueMissing(missingData) {
+async function queueMissing(data) {
 
     const db = await openDatabase();
 
     return new Promise((resolve, reject) => {
 
-        const transaction =
-            db.transaction(
-                STORES.MISSING_QUEUE,
-                "readwrite"
-            );
+        const transaction = db.transaction(
+            STORES.MISSING_QUEUE,
+            "readwrite"
+        );
 
-        const store =
-            transaction.objectStore(
-                STORES.MISSING_QUEUE
-            );
-
+        const store = transaction.objectStore(
+            STORES.MISSING_QUEUE
+        );
 
         store.add({
 
-            ...missingData,
+            ...data,
 
             queuedAt:
                 new Date().toISOString(),
@@ -566,14 +466,12 @@ async function queueMissing(missingData) {
             status: "pending"
         });
 
-
         transaction.oncomplete = () => {
 
             db.close();
 
             resolve();
         };
-
 
         transaction.onerror = () => {
 
@@ -593,32 +491,28 @@ async function getMissingQueue() {
 }
 
 
-
 // ========================================
 // HELP REQUEST QUEUE
 // ========================================
 
-async function queueHelp(helpData) {
+async function queueHelp(data) {
 
     const db = await openDatabase();
 
     return new Promise((resolve, reject) => {
 
-        const transaction =
-            db.transaction(
-                STORES.HELP_QUEUE,
-                "readwrite"
-            );
+        const transaction = db.transaction(
+            STORES.HELP_QUEUE,
+            "readwrite"
+        );
 
-        const store =
-            transaction.objectStore(
-                STORES.HELP_QUEUE
-            );
-
+        const store = transaction.objectStore(
+            STORES.HELP_QUEUE
+        );
 
         store.add({
 
-            ...helpData,
+            ...data,
 
             queuedAt:
                 new Date().toISOString(),
@@ -626,14 +520,12 @@ async function queueHelp(helpData) {
             status: "pending"
         });
 
-
         transaction.oncomplete = () => {
 
             db.close();
 
             resolve();
         };
-
 
         transaction.onerror = () => {
 
@@ -653,7 +545,6 @@ async function getHelpQueue() {
 }
 
 
-
 // ========================================
 // REMOVE FROM QUEUE
 // ========================================
@@ -667,28 +558,28 @@ async function removeFromQueue(
 
     return new Promise((resolve, reject) => {
 
-        const transaction =
-            db.transaction(
-                storeName,
-                "readwrite"
-            );
+        const transaction = db.transaction(
+            storeName,
+            "readwrite"
+        );
 
-        const store =
-            transaction.objectStore(
-                storeName
-            );
-
+        const store = transaction.objectStore(
+            storeName
+        );
 
         store.delete(queueId);
-
 
         transaction.oncomplete = () => {
 
             db.close();
 
+            console.log(
+                "Removed queue item:",
+                queueId
+            );
+
             resolve();
         };
-
 
         transaction.onerror = () => {
 
@@ -700,9 +591,8 @@ async function removeFromQueue(
 }
 
 
-
 // ========================================
-// REMOVE SOS
+// REMOVE FUNCTIONS
 // ========================================
 
 async function removeSOS(queueId) {
@@ -714,11 +604,6 @@ async function removeSOS(queueId) {
 }
 
 
-
-// ========================================
-// REMOVE DAMAGE
-// ========================================
-
 async function removeDamage(queueId) {
 
     return removeFromQueue(
@@ -727,11 +612,6 @@ async function removeDamage(queueId) {
     );
 }
 
-
-
-// ========================================
-// REMOVE MISSING PERSON
-// ========================================
 
 async function removeMissing(queueId) {
 
@@ -742,11 +622,6 @@ async function removeMissing(queueId) {
 }
 
 
-
-// ========================================
-// REMOVE HELP REQUEST
-// ========================================
-
 async function removeHelp(queueId) {
 
     return removeFromQueue(
@@ -756,9 +631,8 @@ async function removeHelp(queueId) {
 }
 
 
-
 // ========================================
-// GET TOTAL PENDING COUNT
+// PENDING COUNT
 // ========================================
 
 async function getPendingCount() {
@@ -775,7 +649,6 @@ async function getPendingCount() {
     const help =
         await getHelpQueue();
 
-
     return (
         sos.length +
         damage.length +
@@ -785,15 +658,16 @@ async function getPendingCount() {
 }
 
 
-
 // ========================================
 // EXPORT SERVICE
 // ========================================
 
 window.indexedDBService = {
 
-    // Cached data
+    // Database
+    openDatabase,
 
+    // Cached data
     saveGuides,
     getGuides,
 
@@ -812,36 +686,32 @@ window.indexedDBService = {
     saveEmergencyContacts,
     getEmergencyContacts,
 
-
-    // Offline queues
-
+    // SOS
     queueSOS,
     getSOSQueue,
+    updateSOS,
+    removeSOS,
 
+    // Damage
     queueDamage,
     getDamageQueue,
+    removeDamage,
 
+    // Missing
     queueMissing,
     getMissingQueue,
+    removeMissing,
 
+    // Help
     queueHelp,
     getHelpQueue,
-
-
-    // Remove after sync
-
-    removeSOS,
-    removeDamage,
-    removeMissing,
     removeHelp,
 
-
     // Pending count
-
     getPendingCount
 };
 
 
 console.log(
-    "IndexedDB service loaded"
+    "IndexedDB service loaded successfully"
 );

@@ -11,15 +11,18 @@ const SYNC_API_URL = "http://127.0.0.1:8000/api/sync";
 
 function getAccessToken() {
 
-    // Primary key used by the login flow
     const accessToken = localStorage.getItem("access_token");
 
     if (accessToken) {
         return accessToken;
     }
 
-    // Fallbacks in case the existing login implementation
-    // uses one of these common token names.
+    const resqnetToken = localStorage.getItem("resqnet_token");
+
+    if (resqnetToken) {
+        return resqnetToken;
+    }
+
     const token = localStorage.getItem("token");
 
     if (token) {
