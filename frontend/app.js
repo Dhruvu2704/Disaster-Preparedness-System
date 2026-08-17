@@ -28,8 +28,24 @@ let currentUserName = "ResQNet User";
 
 const API_BASE = "http://127.0.0.1:8000";
 
+let emergencyMap = null;
 
-async function getShelters() {
+let userLatitude = null;
+let userLongitude = null;
+
+let currentRouteLayer = null;
+
+let selectedDestination = null;
+
+// ---- Emergency Map additions (live tracking / active route state) ----
+let resqUserMarker = null;
+let resqWatchId = null;
+let resqDestinationMarker = null;
+let resqActiveRoute = null;      // { type, resource, route } for the currently drawn route
+let resqShowRouteSteps = false;
+
+
+async function fetchSheltersFromAPI() {
 
     try {
 
@@ -43,7 +59,11 @@ async function getShelters() {
             );
         }
 
-        return await response.json();
+        const shelters = await response.json();
+
+        await saveShelters(shelters);
+
+        return shelters;
 
     } catch (error) {
 
@@ -88,7 +108,7 @@ async function getChecklist() {
     }
 }
 
-async function getHospitals() {
+async function fetchHospitalsFromAPI() {
     try {
         const response = await fetch(
             `${API_BASE}/api/emergency/hospitals/`
@@ -100,7 +120,11 @@ async function getHospitals() {
             );
         }
 
-        return await response.json();
+        const hospitals = await response.json();
+
+        await saveHospitals(hospitals);
+
+        return hospitals;
 
     } catch (error) {
         console.error(
@@ -113,6 +137,65 @@ async function getHospitals() {
         );
 
         return [];
+    }
+}
+
+async function getHospitalsWithOfflineFallback() {
+
+    const hospitals =
+        await fetchHospitalsFromAPI();
+
+    if (Array.isArray(hospitals)) {
+        return hospitals;
+    }
+
+    console.log(
+        "Using cached hospitals from IndexedDB"
+    );
+
+    try {
+
+        return await getHospitals();
+
+    } catch (error) {
+
+        console.error(
+            "Unable to load cached hospitals:",
+            error
+        );
+
+        return [];
+    }
+}
+
+async function getSheltersWithOfflineFallback() {
+
+    // Try the backend first
+    const shelters =
+        await fetchSheltersFromAPI();
+
+    // If backend worked
+    if (Array.isArray(shelters)) {
+        return shelters;
+    }
+
+    // If backend failed, use IndexedDB
+    console.log(
+        "Using cached shelters from IndexedDB"
+    );
+
+    try {
+
+        return await getShelters();
+
+    } catch (error) {
+
+        console.error(
+            "Unable to load cached shelters:",
+            error
+        );
+
+        return null;
     }
 }
 
@@ -162,6 +245,12 @@ document.addEventListener("DOMContentLoaded", function () {
 ========================================================= */
 
 function navigate(page) {
+
+    // Stop watching GPS when leaving the Emergency Map so we
+    // don't keep polling location in the background on other pages.
+    if (currentPage === "map" && page !== "map") {
+        stopWatchingLocation();
+    }
 
     currentPage = page;
 
@@ -4838,12 +4927,47 @@ function mapPage() {
             "Locate shelters, hospitals and emergency resources."
         )}
 
+        <div
+            id="resqLocationStatus"
+            class="
+                card
+                p-3
+                mb-4
+                flex
+                items-center
+                gap-2
+                text-sm
+                font-semibold
+                text-gray-500
+            "
+        >
+            <i data-lucide="loader" class="w-4 h-4"></i>
+            <span id="resqLocationStatusText">Detecting your location...</span>
+        </div>
+
+        <div
+            class="
+                grid
+                grid-cols-2
+                md:grid-cols-4
+                gap-3
+                mb-4
+            "
+        >
+            ${quickAction("Nearest Shelter", "home", "routeToNearestShelter()")}
+            ${quickAction("Nearest Hospital", "hospital", "routeToNearestHospital()")}
+            ${quickAction("My Location", "locate-fixed", "centerOnMyLocation()")}
+            ${quickAction("Cancel Route", "x-circle", "clearNavigationRoute()")}
+        </div>
+
         <div class="card p-4">
             <div
                 id="resqMap"
                 class="command-map bg-gray-200"
             ></div>
         </div>
+
+        <div id="resqNavPanel"></div>
 
         <div
             class="
@@ -4865,19 +4989,54 @@ function mapPage() {
             )}
 
             ${mapLegend(
-                "droplets",
-                "Water"
+                "navigation",
+                "You"
             )}
 
             ${mapLegend(
-                "heart-pulse",
-                "Medical Camps"
+                "route",
+                "Active Route"
             )}
         </div>
    
         `;
 }
 
+// ============================================
+// LOCATION STATUS UI
+// ============================================
+// Small helper so GPS state is always visible in
+// the UI instead of only in the console.
+function updateLocationStatus(state, message) {
+
+    const textEl = document.getElementById("resqLocationStatusText");
+    const wrapEl = document.getElementById("resqLocationStatus");
+
+    if (!textEl || !wrapEl) {
+        return;
+    }
+
+    const icons = {
+        loading: "loader",
+        ok: "map-pin",
+        denied: "shield-alert",
+        error: "alert-triangle"
+    };
+
+    const icon = icons[state] || "map-pin";
+
+    textEl.textContent = message;
+
+    const iconEl = wrapEl.querySelector("i");
+
+    if (iconEl) {
+        iconEl.setAttribute("data-lucide", icon);
+    }
+
+    if (typeof lucide !== "undefined" && lucide.createIcons) {
+        lucide.createIcons();
+    }
+}
 async function initEmergencyMap() {
 
     const mapElement =
@@ -4892,7 +5051,7 @@ async function initEmergencyMap() {
         return;
     }
 
-    const map =
+    emergencyMap =
         L.map("resqMap")
             .setView(
                 [28.6139, 77.2090],
@@ -4905,18 +5064,24 @@ async function initEmergencyMap() {
             attribution:
                 "&copy; OpenStreetMap contributors"
         }
-    ).addTo(map);
+    ).addTo(emergencyMap);
 
 
-    // GET REAL DATA
-    const shelters =
-        await getShelters();
+    // =====================================================
+    // GET SHELTERS + HOSPITALS
+    // =====================================================
 
-    const hospitals =
-        await getHospitals();
+    shelters =
+    await getSheltersWithOfflineFallback();
+
+hospitals =
+    await getHospitalsWithOfflineFallback();
 
 
+    // =====================================================
     // SHELTERS
+    // =====================================================
+
     shelters.forEach(function (shelter) {
 
         if (
@@ -4927,25 +5092,69 @@ async function initEmergencyMap() {
         }
 
         L.marker([
-            shelter.latitude,
-            shelter.longitude
+            Number(shelter.latitude),
+            Number(shelter.longitude)
         ])
-        .addTo(map)
+        .addTo(emergencyMap)
         .bindPopup(`
-            <b>🏠 ${escapeHTML(shelter.name)}</b>
-            <br>
-            Capacity: ${shelter.capacity}
-            <br>
-            Status: ${escapeHTML(shelter.status)}
-            <br>
-            District: ${escapeHTML(
-                shelter.district || "N/A"
-            )}
+            <div style="min-width:220px;">
+
+                <h3 style="margin:0 0 8px 0;">
+                    🏠 ${escapeHTML(
+                        shelter.name || "Shelter"
+                    )}
+                </h3>
+
+                <div>
+                    <b>Capacity:</b>
+                    ${shelter.capacity ?? "N/A"}
+                </div>
+
+                <div>
+                    <b>Status:</b>
+                    ${escapeHTML(
+                        shelter.status || "N/A"
+                    )}
+                </div>
+
+                <div>
+                    <b>District:</b>
+                    ${escapeHTML(
+                        shelter.district || "N/A"
+                    )}
+                </div>
+
+                <br>
+
+               <button
+                    onclick="navigateToResourceById(
+                        'shelter',
+                        '${String(shelter.id)}'
+                    )"
+                    style="
+                        width:100%;
+                        padding:9px 12px;
+                        border:none;
+                        border-radius:8px;
+                        background:#064e3b;
+                        color:white;
+                        font-weight:600;
+                        cursor:pointer;
+                    "
+                >
+                    🧭 Navigate here
+                </button>
+
+            </div>
         `);
+
     });
 
 
+    // =====================================================
     // HOSPITALS
+    // =====================================================
+
     hospitals.forEach(function (hospital) {
 
         if (
@@ -4956,55 +5165,932 @@ async function initEmergencyMap() {
         }
 
         L.marker([
-            hospital.latitude,
-            hospital.longitude
+            Number(hospital.latitude),
+            Number(hospital.longitude)
         ])
-        .addTo(map)
+        .addTo(emergencyMap)
         .bindPopup(`
-            <b>🏥 ${escapeHTML(hospital.name)}</b>
-            <br>
-            📞 ${escapeHTML(hospital.phone)}
-            <br>
-            🛏️ Beds available:
-            ${hospital.beds_available}
+            <div style="min-width:220px;">
+
+                <h3 style="margin:0 0 8px 0;">
+                    🏥 ${escapeHTML(
+                        hospital.name || "Hospital"
+                    )}
+                </h3>
+
+                <div>
+                    <b>Phone:</b>
+                    ${escapeHTML(
+                        hospital.phone || "N/A"
+                    )}
+                </div>
+
+                <div>
+                    <b>Beds available:</b>
+                    ${hospital.beds_available ?? "N/A"}
+                </div>
+
+                <br>
+
+                <button
+                    onclick="navigateToResourceById(
+                        'hospital',
+                        '${String(hospital.id)}'
+                    )"
+                    style="
+                        width:100%;
+                        padding:9px 12px;
+                        border:none;
+                        border-radius:8px;
+                        background:#064e3b;
+                        color:white;
+                        font-weight:600;
+                        cursor:pointer;
+                    "
+                >
+                    🧭 Navigate here
+                </button>
+
+            </div>
         `);
+
     });
 
 
-    // USER LOCATION
-    if (navigator.geolocation) {
+    // =====================================================
+    // USER'S CURRENT LOCATION (live tracking)
+    // =====================================================
 
-        navigator.geolocation.getCurrentPosition(
-            function (position) {
+    startWatchingLocation();
 
-                const latitude =
-                    position.coords.latitude;
+}
 
-                const longitude =
-                    position.coords.longitude;
+// ============================================
+// LIVE LOCATION TRACKING
+// ============================================
+// Uses watchPosition() so the user marker moves as they move,
+// but this only updates userLatitude/userLongitude and the
+// marker on the map — it never triggers a new OSRM request by
+// itself. Re-routing only happens when the user explicitly
+// asks to navigate again.
+function startWatchingLocation() {
 
-                L.marker([
-                    latitude,
-                    longitude
-                ])
-                .addTo(map)
-                .bindPopup(
-                    "<b>📍 Your Current Location</b>"
-                )
-                .openPopup();
+    if (!navigator.geolocation) {
+        updateLocationStatus(
+            "error",
+            "Location unavailable on this browser"
+        );
+        return;
+    }
 
-            },
-            function (error) {
+    updateLocationStatus("loading", "Detecting your location...");
 
-                console.warn(
-                    "Location unavailable:",
-                    error
-                );
+    stopWatchingLocation();
 
+    resqWatchId = navigator.geolocation.watchPosition(
+
+        function (position) {
+
+            userLatitude = position.coords.latitude;
+            userLongitude = position.coords.longitude;
+
+            const normalizedLat = normalizeCoordinate(userLatitude);
+            const normalizedLon = normalizeCoordinate(userLongitude);
+
+            if (normalizedLat === null || normalizedLon === null) {
+                return;
             }
+
+            setUserLocationOnMap(normalizedLat, normalizedLon);
+
+            updateLocationStatus("ok", "📍 Location detected");
+        },
+
+        function (error) {
+
+            console.error("GPS error:", error);
+
+            if (error && error.code === 1) {
+                updateLocationStatus(
+                    "denied",
+                    "⚠️ Location permission required"
+                );
+            } else {
+                updateLocationStatus(
+                    "error",
+                    "📍 Location unavailable"
+                );
+            }
+        },
+
+        {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 10000
+        }
+    );
+}
+
+function stopWatchingLocation() {
+
+    if (resqWatchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(resqWatchId);
+    }
+
+    resqWatchId = null;
+}
+
+// Creates the "you are here" marker once, then just moves it
+// on subsequent GPS updates instead of stacking new markers.
+function setUserLocationOnMap(lat, lon, recenter) {
+
+    if (!emergencyMap) {
+        return;
+    }
+
+    if (!resqUserMarker) {
+
+        resqUserMarker = L.circleMarker(
+            [lat, lon],
+            {
+                radius: 9,
+                weight: 3,
+                color: "#0ea5e9",
+                fillColor: "#0ea5e9",
+                fillOpacity: 0.85
+            }
+        )
+        .addTo(emergencyMap)
+        .bindPopup("<b>📍 Your Current Location</b>");
+
+        emergencyMap.setView([lat, lon], 13);
+
+    } else {
+
+        resqUserMarker.setLatLng([lat, lon]);
+
+        if (recenter) {
+            emergencyMap.setView([lat, lon], 13);
+        }
+    }
+}
+
+function centerOnMyLocation() {
+
+    if (
+        !emergencyMap ||
+        userLatitude === null ||
+        userLongitude === null
+    ) {
+        showToast("Your location is not available yet.");
+        return;
+    }
+
+    setUserLocationOnMap(
+        Number(userLatitude),
+        Number(userLongitude),
+        true
+    );
+}
+
+// ============================================
+// COORDINATE VALIDATION
+// ============================================
+function normalizeCoordinate(value) {
+
+    const num = Number(value);
+
+    if (!Number.isFinite(num)) {
+        return null;
+    }
+
+    return num;
+}
+
+// ============================================
+// RESOLVE RESOURCE ID -> RESOURCE OBJECT
+// ============================================
+// Popup buttons only have the resource's id available
+// (shelter.id / hospital.id) at render time. This looks
+// up the actual resource object from the in-memory
+// shelters/hospitals arrays populated in initEmergencyMap(),
+// then hands off to navigateToResource() with the real object.
+function navigateToResourceById(type, id) {
+
+    const list =
+        type === "shelter"
+            ? shelters
+            : hospitals;
+
+    if (!Array.isArray(list)) {
+        console.error(
+            "Resource list not loaded yet:",
+            type
+        );
+
+        showToast(
+            "Resources are still loading. Please try again."
+        );
+
+        return;
+    }
+
+    const resource =
+        list.find(
+            item => String(item.id) === String(id)
+        );
+
+    if (!resource) {
+        console.error(
+            "Resource not found for id:",
+            type,
+            id
+        );
+
+        showToast(
+            "Destination is no longer available."
+        );
+
+        return;
+    }
+
+    return navigateToResource(type, resource);
+}
+
+async function navigateToResource(type, resource) {
+
+    console.log("🧭 Navigation requested:", type, resource);
+
+    // ============================================
+    // CHECK MAP
+    // ============================================
+
+    if (!emergencyMap) {
+        console.error("Emergency map is not initialized.");
+
+        showToast("Map is not ready yet.");
+
+        return;
+    }
+
+
+    // ============================================
+    // CHECK GPS
+    // ============================================
+
+    if (
+        userLatitude === null ||
+        userLongitude === null ||
+        !Number.isFinite(Number(userLatitude)) ||
+        !Number.isFinite(Number(userLongitude))
+    ) {
+
+        console.warn(
+            "GPS not available:",
+            userLatitude,
+            userLongitude
+        );
+
+        showToast(
+            "Your current location is not available yet."
+        );
+
+        return;
+    }
+
+
+    // ============================================
+    // GET DESTINATION
+    // ============================================
+
+    const destinationLatitude =
+        Number(resource.latitude);
+
+    const destinationLongitude =
+        Number(resource.longitude);
+
+
+    if (
+        !Number.isFinite(destinationLatitude) ||
+        !Number.isFinite(destinationLongitude)
+    ) {
+
+        console.error(
+            "Invalid destination:",
+            resource
+        );
+
+        showToast(
+            "This location does not have valid coordinates."
+        );
+
+        return;
+    }
+
+
+    // ============================================
+    // SAVE DESTINATION
+    // ============================================
+
+    selectedDestination = {
+        type: type,
+        resource: resource
+    };
+
+
+    // ============================================
+    // REMOVE OLD ROUTE
+    // ============================================
+
+    if (currentRouteLayer) {
+
+        emergencyMap.removeLayer(
+            currentRouteLayer
+        );
+
+        currentRouteLayer = null;
+    }
+
+
+    showToast(
+        "🛣️ Calculating road route..."
+    );
+
+
+    // ============================================
+    // COORDINATES
+    // ============================================
+
+    const startLat =
+        Number(userLatitude);
+
+    const startLon =
+        Number(userLongitude);
+
+    console.log(
+        "📍 User:",
+        startLat,
+        startLon
+    );
+
+    console.log(
+        "📍 Destination:",
+        destinationLatitude,
+        destinationLongitude
+    );
+
+
+    // ============================================
+    // OSRM URL
+    // ============================================
+
+    const routeUrl =
+        "https://router.project-osrm.org/route/v1/driving/" +
+        `${startLon},${startLat};` +
+        `${destinationLongitude},${destinationLatitude}` +
+        "?overview=full&geometries=geojson&steps=true";
+
+
+    console.log(
+        "🛣️ OSRM request:",
+        routeUrl
+    );
+
+
+    try {
+
+        // ========================================
+        // REQUEST ROUTE
+        // ========================================
+
+        const response =
+            await fetch(routeUrl);
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                `Routing server returned HTTP ${response.status}`
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "🛣️ OSRM response:",
+            data
+        );
+
+
+        // ========================================
+        // CHECK ROUTE
+        // ========================================
+
+        if (
+            data.code !== "Ok" ||
+            !data.routes ||
+            data.routes.length === 0
+        ) {
+
+            throw new Error(
+                "No road route was found."
+            );
+        }
+
+
+        // ========================================
+        // GET BEST ROUTE
+        // ========================================
+
+        const route =
+            data.routes[0];
+
+
+        // ========================================
+        // DRAW ROUTE
+        // ========================================
+
+        currentRouteLayer =
+            L.geoJSON(
+                route.geometry,
+                {
+                    style: {
+                        weight: 7,
+                        opacity: 0.9,
+                        color: "#f97316"
+                    }
+                }
+            ).addTo(emergencyMap);
+
+
+        // ========================================
+        // DESTINATION MARKER
+        // ========================================
+
+        if (resqDestinationMarker) {
+            emergencyMap.removeLayer(resqDestinationMarker);
+            resqDestinationMarker = null;
+        }
+
+        resqDestinationMarker = L.marker(
+            [destinationLatitude, destinationLongitude],
+            {
+                icon: L.divIcon({
+                    className: "",
+                    html:
+                        '<div style="font-size:26px;line-height:1;">' +
+                        (type === "shelter" ? "🏠" : "🏥") +
+                        "</div>",
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 26]
+                })
+            }
+        ).addTo(emergencyMap);
+
+
+        // ========================================
+        // DISTANCE
+        // ========================================
+
+        const distanceKm =
+            route.distance / 1000;
+
+
+        // ========================================
+        // ETA
+        // ========================================
+
+        const durationMinutes =
+            Math.round(
+                route.duration / 60
+            );
+
+
+        // ========================================
+        // DESTINATION NAME
+        // ========================================
+
+        const destinationName =
+            resource.name ||
+            (
+                type === "shelter"
+                    ? "Shelter"
+                    : "Hospital"
+            );
+
+
+        // ========================================
+        // DESTINATION POPUP
+        // ========================================
+
+        L.popup()
+            .setLatLng([
+                destinationLatitude,
+                destinationLongitude
+            ])
+            .setContent(`
+
+                <div style="
+                    min-width:220px;
+                    font-family:Arial,sans-serif;
+                ">
+
+                    <h3 style="
+                        margin:0 0 10px 0;
+                    ">
+
+                        ${
+                            type === "shelter"
+                                ? "🏠"
+                                : "🏥"
+                        }
+
+                        ${escapeHTML(
+                            destinationName
+                        )}
+
+                    </h3>
+
+                    <div>
+                        📏
+                        <b>Distance:</b>
+                        ${distanceKm.toFixed(2)} km
+                    </div>
+
+                    <div style="margin-top:6px;">
+                        ⏱️
+                        <b>Estimated time:</b>
+                        ${durationMinutes} min
+                    </div>
+
+                </div>
+
+            `)
+            .openOn(emergencyMap);
+
+
+        // ========================================
+        // FIT MAP TO ROUTE
+        // ========================================
+
+        emergencyMap.fitBounds(
+            currentRouteLayer.getBounds(),
+            {
+                padding: [50, 50]
+            }
+        );
+
+
+        // ========================================
+        // SUCCESS
+        // ========================================
+
+        console.log(
+            "✅ ROUTE SUCCESSFUL"
+        );
+
+        console.log(
+            "📏 Distance:",
+            distanceKm.toFixed(2),
+            "km"
+        );
+
+        console.log(
+            "⏱️ ETA:",
+            durationMinutes,
+            "minutes"
+        );
+
+        // Store the full route so the UI (distance/ETA/steps) can be
+        // re-rendered later (e.g. after a resize) WITHOUT firing another
+        // OSRM request.
+        resqActiveRoute = {
+            type: type,
+            resource: resource,
+            route: route,
+            destinationName: destinationName
+        };
+
+        renderNavPanel();
+
+        showToast(
+            `Route found: ${distanceKm.toFixed(1)} km • ${durationMinutes} min`
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "❌ ROUTING ERROR:",
+            error
+        );
+
+        showToast(
+            "Unable to calculate road route."
         );
     }
 }
+
+// ============================================
+// NAVIGATION STATUS PANEL
+// ============================================
+// Renders distance / ETA / cancel button / turn-by-turn steps
+// from the ALREADY-fetched route stored in resqActiveRoute.
+// Never re-requests OSRM.
+function renderNavPanel() {
+
+    const panel = document.getElementById("resqNavPanel");
+
+    if (!panel) {
+        return;
+    }
+
+    if (!resqActiveRoute) {
+        panel.innerHTML = "";
+        return;
+    }
+
+    const { type, route, destinationName } = resqActiveRoute;
+
+    const distanceKm = (route.distance / 1000).toFixed(1);
+    const durationMin = Math.round(route.duration / 60);
+
+    const steps =
+        (route.legs && route.legs[0] && route.legs[0].steps) || [];
+
+    panel.innerHTML = `
+
+        <div class="card p-5 mt-4">
+
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2 font-bold text-ink">
+                    <i data-lucide="navigation" class="w-5 h-5"></i>
+                    NAVIGATION ACTIVE
+                </div>
+
+                <button
+                    onclick="clearNavigationRoute()"
+                    class="
+                        text-xs
+                        font-bold
+                        px-3
+                        py-1.5
+                        rounded-lg
+                        bg-red-100
+                        text-coral
+                    "
+                >
+                    CANCEL ROUTE
+                </button>
+            </div>
+
+            <div class="text-sm text-gray-500 mb-3">
+                Destination: <b class="text-ink">${escapeHTML(destinationName)}</b>
+                ${type === "shelter" ? "🏠" : "🏥"}
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-3">
+
+                <div class="bg-paper rounded-xl p-3">
+                    <div class="text-xs text-gray-500">📏 Distance</div>
+                    <div class="text-lg font-bold text-ink">${distanceKm} km</div>
+                </div>
+
+                <div class="bg-paper rounded-xl p-3">
+                    <div class="text-xs text-gray-500">⏱️ ETA</div>
+                    <div class="text-lg font-bold text-ink">${durationMin} min</div>
+                </div>
+
+            </div>
+
+            ${
+                steps.length > 0
+                    ? `
+                <button
+                    onclick="toggleRouteSteps()"
+                    class="text-xs font-semibold text-mint mb-2"
+                >
+                    ${resqShowRouteSteps ? "Hide" : "Show"} turn-by-turn directions
+                </button>
+
+                <div class="${resqShowRouteSteps ? "" : "hidden"} space-y-2 max-h-56 overflow-y-auto">
+                    ${steps
+                        .map(function (step, index) {
+                            const roadName =
+                                step.name && step.name.length > 0
+                                    ? step.name
+                                    : "Unnamed road";
+
+                            const stepDistanceM = Math.round(step.distance || 0);
+
+                            return `
+                                <div class="flex items-start gap-2 text-sm">
+                                    <span class="font-bold text-mint">${index + 1}.</span>
+                                    <span class="text-gray-600">
+                                        ${escapeHTML(roadName)}
+                                        <span class="text-gray-400">— ${stepDistanceM} m</span>
+                                    </span>
+                                </div>
+                            `;
+                        })
+                        .join("")}
+                </div>
+                `
+                    : ""
+            }
+
+        </div>
+
+    `;
+
+    if (typeof lucide !== "undefined" && lucide.createIcons) {
+        lucide.createIcons();
+    }
+}
+
+function toggleRouteSteps() {
+    resqShowRouteSteps = !resqShowRouteSteps;
+    renderNavPanel();
+}
+
+// ============================================
+// CANCEL / CLEAR ACTIVE ROUTE
+// ============================================
+function clearNavigationRoute() {
+
+    if (currentRouteLayer && emergencyMap) {
+        emergencyMap.removeLayer(currentRouteLayer);
+    }
+
+    if (resqDestinationMarker && emergencyMap) {
+        emergencyMap.removeLayer(resqDestinationMarker);
+    }
+
+    currentRouteLayer = null;
+    resqDestinationMarker = null;
+    resqActiveRoute = null;
+    selectedDestination = null;
+    resqShowRouteSteps = false;
+
+    renderNavPanel();
+
+    showToast("Route cleared.");
+}
+
+// ============================================
+// NEAREST-RESOURCE LOGIC (Haversine + suitability)
+// ============================================
+// Distance-only nearest-resource lookup, plus a lightweight
+// "suitability" ranking that also considers whether a resource
+// is actually usable right now, using ONLY fields the backend
+// already provides (status / capacity / beds_available). No
+// availability data is invented.
+function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+
+    const R = 6371; // Earth radius in km
+
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+}
+
+function getNearestResource(type) {
+
+    if (
+        userLatitude === null ||
+        userLongitude === null
+    ) {
+        return null;
+    }
+
+    const list = type === "shelter" ? shelters : hospitals;
+
+    if (!Array.isArray(list) || list.length === 0) {
+        return null;
+    }
+
+    const uLat = Number(userLatitude);
+    const uLon = Number(userLongitude);
+
+    const candidates = list
+        .filter(function (item) {
+            return (
+                normalizeCoordinate(item.latitude) !== null &&
+                normalizeCoordinate(item.longitude) !== null
+            );
+        })
+        .map(function (item) {
+
+            const distanceKm = haversineDistanceKm(
+                uLat,
+                uLon,
+                Number(item.latitude),
+                Number(item.longitude)
+            );
+
+            // Suitability: prefer closer AND actually usable resources,
+            // without inventing data the backend doesn't provide.
+            let penalty = 0;
+
+            const status = (item.status || "").toString().toLowerCase();
+
+            if (status && status !== "active") {
+                penalty += 50; // heavily deprioritize inactive/closed resources
+            }
+
+            if (
+                type === "shelter" &&
+                item.capacity !== undefined &&
+                item.capacity !== null &&
+                Number(item.capacity) <= 0
+            ) {
+                penalty += 50;
+            }
+
+            if (
+                type === "hospital" &&
+                item.beds_available !== undefined &&
+                item.beds_available !== null &&
+                Number(item.beds_available) <= 0
+            ) {
+                penalty += 50;
+            }
+
+            return {
+                item: item,
+                distanceKm: distanceKm,
+                suitability: distanceKm + penalty
+            };
+        });
+
+    if (candidates.length === 0) {
+        return null;
+    }
+
+    candidates.sort(function (a, b) {
+        return a.suitability - b.suitability;
+    });
+
+    return candidates[0];
+}
+
+async function routeToNearestShelter() {
+
+    if (userLatitude === null || userLongitude === null) {
+        showToast("Your location is not available yet.");
+        return;
+    }
+
+    const nearest = getNearestResource("shelter");
+
+    if (!nearest) {
+        showToast("No shelters are currently available.");
+        return;
+    }
+
+    showToast(
+        `🏠 Nearest shelter: ${nearest.item.name || "Shelter"} (${nearest.distanceKm.toFixed(1)} km)`
+    );
+
+    await navigateToResource("shelter", nearest.item);
+}
+
+async function routeToNearestHospital() {
+
+    if (userLatitude === null || userLongitude === null) {
+        showToast("Your location is not available yet.");
+        return;
+    }
+
+    const nearest = getNearestResource("hospital");
+
+    if (!nearest) {
+        showToast("No hospitals are currently available.");
+        return;
+    }
+
+    showToast(
+        `🏥 Nearest hospital: ${nearest.item.name || "Hospital"} (${nearest.distanceKm.toFixed(1)} km)`
+    );
+
+    await navigateToResource("hospital", nearest.item);
+}
+
+
+
 
 
 /* =========================================================
@@ -5058,7 +6144,7 @@ async function loadShelters() {
 
 
     const shelters =
-        await getShelters();
+        await fetchSheltersFromAPI();
 
 
     if (!shelters.length) {
@@ -5576,12 +6662,25 @@ function sosPage() {
                     prepared with your current location.
                 </p>
 
+                <p
+                    id="resqSosHint"
+                    class="text-sm font-semibold text-coral mt-6"
+                >
+                    Hold for 3 seconds to activate
+                </p>
 
                 <button
-                    onclick="triggerSOS()"
+                    id="resqSosButton"
+                    onmousedown="startSOSHold()"
+                    onmouseup="cancelSOSHold()"
+                    onmouseleave="cancelSOSHold()"
+                    ontouchstart="startSOSHold()"
+                    ontouchend="cancelSOSHold()"
                     class="
-                        mt-8
+                        mt-3
                         w-full
+                        relative
+                        overflow-hidden
                         bg-coral
                         text-white
                         py-4
@@ -5589,18 +6688,44 @@ function sosPage() {
                         font-bold
                         text-lg
                         sos-button
+                        select-none
                     "
+                    style="user-select:none;"
                 >
 
-                    <i
-                        data-lucide="siren"
-                        class="w-5 h-5 inline"
-                    ></i>
+                    <div
+                        id="resqSosProgress"
+                        style="
+                            position:absolute;
+                            left:0;
+                            top:0;
+                            bottom:0;
+                            width:0%;
+                            background:rgba(0,0,0,0.25);
+                        "
+                    ></div>
 
-                    SEND SOS
+                    <span style="position:relative;">
+                        <i
+                            data-lucide="siren"
+                            class="w-5 h-5 inline"
+                        ></i>
+                        HOLD TO ACTIVATE
+                    </span>
 
                 </button>
 
+                <div id="resqSosStatus" class="mt-5 text-left hidden">
+
+                    <div class="card p-4 bg-paper">
+                        <p class="font-bold text-ink flex items-center gap-2">
+                            <i data-lucide="siren" class="w-4 h-4 text-coral"></i>
+                            SOS ACTIVATED
+                        </p>
+                        <div id="resqSosStatusBody" class="text-sm text-gray-600 mt-2 space-y-1"></div>
+                    </div>
+
+                </div>
 
                 <p
                     class="
@@ -5618,6 +6743,123 @@ function sosPage() {
 
     `;
 
+}
+
+// ============================================
+// SOS — DELIBERATE HOLD-TO-ACTIVATE
+// ============================================
+// Requires holding the button for 3 continuous seconds before
+// triggerSOS() (the existing, real backend integration) fires.
+// This prevents accidental taps from sending a live emergency
+// request.
+let resqSosHoldTimeout = null;
+
+function startSOSHold() {
+
+    const progress = document.getElementById("resqSosProgress");
+    const hint = document.getElementById("resqSosHint");
+
+    if (!progress) {
+        return;
+    }
+
+    progress.style.transition = "width 3s linear";
+    progress.style.width = "100%";
+
+    if (hint) {
+        hint.textContent = "Keep holding...";
+    }
+
+    clearTimeout(resqSosHoldTimeout);
+
+    resqSosHoldTimeout = setTimeout(async function () {
+
+        const hintEl = document.getElementById("resqSosHint");
+
+        if (hintEl) {
+            hintEl.textContent = "🚨 SOS ACTIVATED — sending...";
+        }
+
+        await activateSOS();
+
+    }, 3000);
+}
+
+function cancelSOSHold() {
+
+    clearTimeout(resqSosHoldTimeout);
+
+    const progress = document.getElementById("resqSosProgress");
+    const hint = document.getElementById("resqSosHint");
+
+    if (progress) {
+        progress.style.transition = "width 0.2s ease";
+        progress.style.width = "0%";
+    }
+
+    if (hint) {
+        hint.textContent = "Hold for 3 seconds to activate";
+    }
+}
+
+// Shows an honest local "prepared" state immediately, then calls
+// the real triggerSOS() and reports whether it actually reached
+// the backend — never claims a submission succeeded before we
+// know that.
+async function activateSOS() {
+
+    const statusWrap = document.getElementById("resqSosStatus");
+    const statusBody = document.getElementById("resqSosStatusBody");
+
+    if (statusWrap) {
+        statusWrap.classList.remove("hidden");
+    }
+
+    if (statusBody) {
+        statusBody.innerHTML = `
+            <div>📍 Location captured (or being captured)</div>
+            <div>🧭 SOS prepared locally — sending to emergency services...</div>
+        `;
+    }
+
+    try {
+
+        await triggerSOS();
+
+        // triggerSOS() shows its own toast/alert with the real backend
+        // result (success, offline-queued, or failed) — we don't
+        // duplicate a success claim here since we have no separate
+        // signal of the outcome.
+        if (statusBody) {
+            statusBody.innerHTML = `
+                <div>📍 Location sent with your request</div>
+                <div>See the confirmation above for the backend result.</div>
+            `;
+        }
+
+    } catch (error) {
+
+        console.error("SOS activation error:", error);
+
+        if (statusBody) {
+            statusBody.innerHTML = `
+                <div>⚠️ SOS prepared locally but may not have reached the backend</div>
+                <div>Please call emergency services directly if this persists.</div>
+            `;
+        }
+    }
+
+    const hint = document.getElementById("resqSosHint");
+    const progress = document.getElementById("resqSosProgress");
+
+    if (hint) {
+        hint.textContent = "Hold for 3 seconds to activate";
+    }
+
+    if (progress) {
+        progress.style.transition = "width 0.2s ease";
+        progress.style.width = "0%";
+    }
 }
 
 function getUserIdFromToken() {
